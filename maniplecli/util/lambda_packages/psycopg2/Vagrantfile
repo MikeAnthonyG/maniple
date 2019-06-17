@@ -1,0 +1,53 @@
+# Via https://github.com/vmtyler/vagrant-lambda-python-build
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+$script = <<SCRIPT
+#!/bin/bash
+sleep 10
+yum -y install epel-release gcc
+yum -y install python-pip python-devel postgresql-devel libxml2 libxml2-devel libxslt libxslt-devel openssl-devel
+# for PIL
+yum -y install libjpeg-turbo-devel
+pip install virtualenv
+virtualenv tmpenv
+source tmpenv/bin/activate
+pip install --upgrade pip
+pip install -r /vagrant/requirements.txt
+pgfiles=(/vagrant/postgresql*.tar.gz)
+psfiles=(/vagrant/psycopg2*.tar.gz)
+if [ -e "${pgfiles[0]}" -a -e ${psfiles[0]} ]; then
+  cp /vagrant/postgresql.tar.gz /home/vagrant/postgresql.tar.gz
+  cp /vagrant/psycopg2.tar.gz /home/vagrant/psycopg2.tar.gz
+  cd /home/vagrant
+  tar -xzvf postgresql.tar.gz
+  tar -xzvf psycopg2.tar.gz
+  cd postgresql-*/
+  ./configure --with-openssl --without-readline --without-zlib --with-prefix=~/lib/libpq
+  make
+  make install
+  cd /home/vagrant/postgresql-*/src/bin/pg_config
+  make
+  make install
+  cd /home/vagrant/psycopg2-*
+  a=$(find /home/vagrant/ -name pg_config -type f)
+  echo "pg_config=$a" >> /home/vagrant/psycopg2-*/setup.cfg
+  echo "static_libpq=1" >> /home/vagrant/psycopg2-*/setup.cfg
+  python setup.py build
+  mv /home/vagrant/psycopg2-2.6/build/lib.linux-x86_64-2.7/psycopg2 /home/vagrant/tmpenv/lib/python2.7/site-packages/psycopg2
+fi
+rm -rf /vagrant/requirements/*
+cp -R /home/vagrant/tmpenv/lib/python2.7/site-packages/* /vagrant/requirements/
+SCRIPT
+
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure(2) do |config|
+  config.vm.box = "boxcutter/centos72"
+  config.vm.provision "shell", inline: $script
+end
+

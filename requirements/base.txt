@@ -1,0 +1,8 @@
+boto3>=1.9.73
+click~=6.7
+clint==0.5.1
+colorama==0.4.1
+mock==3.0.5
+pathlib==1.0.1
+pyfiglet==0.8.post1
+pyhcl==0.3.12
