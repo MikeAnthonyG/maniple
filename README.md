@@ -37,7 +37,6 @@ In your terraform directory.
 
     $ maniple pack -c -up
     $ terraform apply
-    $ maniple pack -uf 
 
 ### Working with a function that is already created
 
