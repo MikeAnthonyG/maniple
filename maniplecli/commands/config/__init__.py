@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sys
+import re
 import zipfile
 
 from pathlib    import Path
@@ -12,11 +13,8 @@ from zipfile     import ZipFile
 HELP_TEXT = '''
 This will set up the correct filepaths for working with terraform so that they don't need to be re-entered each time. \n
 \b
-Set up the location of the terraform directory you are currently working in.
-$ maniple config -t c:/Users/repo/terraform/lambda \n
-\b
 Set up the location of the terraform file you want to work with. Defaults to "main.tf"
-$ maniple config -d ./main.tf \n
+$ maniple config -t ./main.tf \n
 \b
 Set up s3 bucket.
 $ maniple config -s3 "s3://lambda-code" \n
@@ -24,7 +22,7 @@ $ maniple config -s3 "s3://lambda-code" \n
 Set up s3 key
 $ maniple config -k "path/to/package.zip" \n
 \b
-Set current Lambda function name
+Set current Lambda function name (This will reset your config file.)
 $ maniple config -l "lambda_name" \n
 \b
 Point to your python requirements text file.
@@ -66,10 +64,10 @@ def get_config(ctx, param, value):
         return
 
     for key, value in CONFIG.items():
-        if value is not None:
-            click.echo("{}{}: {}".format(click.style(key,fg="green"), (13-len(key))*" ", value))
-        elif key == 'package':
+        if key == "package":
             continue
+        elif value is not None:
+            click.echo("{}{}: {}".format(click.style(key,fg="green"), (13-len(key))*" ", value))
         else:
             click.echo("{}{}: {}".format(click.style(key,fg="red"), (13-len(key))*" ", value))
     ctx.exit()
@@ -103,7 +101,6 @@ def get_saved_configs(ctx, param, value):
 @click.option("-g", "--get", help="Get current config", is_flag=True, callback=get_config, is_eager=True)
 @click.option("-c", "--clear", help="Clear current config", is_flag=True, callback=clear_config, is_eager=True)
 @click.option("-S", "--see", help="List saved configs.", is_flag=True, callback=get_saved_configs, is_eager=True)
-@click.option("-d", "--tf-dir", help="Set current terraform directory",default=None)
 @click.option("-t", "--tf-file", help="TF file, defaults to main.tf",default=None)
 @click.option("-s3", "--s3-bucket", help="Set s3 bucket", default=None)
 @click.option("-k", "--s3-key", help="Set s3 key", default=None)
@@ -115,11 +112,19 @@ def get_saved_configs(ctx, param, value):
 @click.option("-save", help="Save config file.", nargs=1, type=str, default=None)
 @click.option("-open", 'open_', help="Open config file.", nargs=1, type=str, default=None)
 @click.option("-load", help="Loads the config from the current directory's contents", is_flag=True, default=False)
-def cli(tf_dir, tf_file, s3_bucket, s3_key, lambda_name, get, clear, requirements, script, package, replace,
+def cli(tf_file, s3_bucket, s3_key, lambda_name, get, clear, requirements, script, package, replace,
         save, open_, see, load):
+    
+    global CONFIG
+
+    if lambda_name is not None:
+        for key, value in CONFIG.items():
+            if key == "tf_file":
+                CONFIG[key] = "main.tf"
+            else:
+                CONFIG[key] = None
 
     run_file_options(
-        tf_dir        = tf_dir, 
         tf_file       = tf_file, 
         s3_bucket     = s3_bucket,
         s3_key        = s3_key, 
@@ -205,21 +210,50 @@ def run_general_options(get, clear, replace, save, open_, load):
     
 def _add_defaults_to_config():
     global CONFIG
+    try:
+        with open(CONFIG['tf_file'], 'r') as f:
+            tf = hcl.load(f)
+        try:
+            runtime = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['runtime']
+            handler = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['handler'].split('.')[0]
+        except KeyError as e:
+            click.secho("Lambda resource with name {} not found in .tf file.", fg="red")
+            sys.exit(1)
+    except FileNotFoundError as e:
+        click.secho("Main terraform file not found!", fg="red")
     path = Path(".")
     files = os.listdir(path) 
     for f in files:
-        if (f[-2:] == 'py' or f[-2:] == 'js') and CONFIG['script'] == None:
-            CONFIG['script'] = Path(f).resolve().__str__()
-        if (f == 'requirements.txt' or  f == 'packages.json') and CONFIG['requirements'] == None:
+        if CONFIG['script'] == None:
+            if f[-2:] == 'js' and 'nodejs' in runtime and handler == f[:-3]:
+                CONFIG['script'] = Path(f).resolve().__str__()
+            if f[-2:] == 'py' and 'python' in runtime and handler == f[:-3]:
+                CONFIG['script'] = Path(f).resolve().__str__()
+        if f == 'requirements.txt' and CONFIG['requirements'] == None and 'python' in runtime:
+            CONFIG['requirements'] = Path(f).resolve().__str__()
+        if f == 'package.json' and CONFIG['requirements'] == None and 'nodejs' in runtime:
             CONFIG['requirements'] = Path(f).resolve().__str__()
         if f == CONFIG['tf_file']:
-            with open(CONFIG['tf_file'], 'r') as f:
-                tf = hcl.load(f)
             try:
                 if CONFIG['s3_bucket'] == None:
                     CONFIG['s3_bucket'] = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_bucket']
                 if CONFIG['s3_key'] == None:
-                    CONFIG['s3_key'] = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_key']
+                    CONFIG['s3_key'] = _determine_version(tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_key'], tf)
             except KeyError as e:
-                click.secho("Warning: Lambda name is not set or doesn't match the terraform file.", fg="red")
+                click.echo("Lambda name is not set or doesn't match the terraform file.")
+                sys.exit(1)
+
+def _determine_version(key, tf):
+    parsed_key = []
+    for x in key.strip('/').split('/'):
+        try:
+            match = re.match("\${var\.(.*)}", x)
+            if match is not None:
+                parsed_key.append(x.replace(x, tf['variable'][match.group(1)]['default']))
+            else:
+                parsed_key.append(x)
+        except KeyError as e:
+            click.secho("Failed to handle S3 Key terraform variables.", fg="red")
+            sys.exit(1)
+    return '/'.join(parsed_key)[1:]
                 

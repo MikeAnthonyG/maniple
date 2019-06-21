@@ -5,6 +5,5 @@
   "s3_bucket": null,
   "s3_key": null,
   "script": null,
-  "tf_dir": null,
   "tf_file": "main.tf"
 }
