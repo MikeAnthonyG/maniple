@@ -8,6 +8,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import re
 import zipfile
 
 from maniplecli.util.lambda_packages import lambda_packages
@@ -154,12 +155,15 @@ def _update_script(package, script):
             zip.write(script, script.split("\\")[-1])    
         else:
             zip.write(script, script.split("\\")[-1])  
-    click.secho("Success.", fg="green")
+    click.secho("Script updated.", fg="green")
     
 def _upload_package(s3_bucket, s3_key, package):
-    s3 = boto3.resource('s3')
-    s3.Bucket(s3_bucket).upload_file(os.path.join(package, "{}.zip".format(package)), s3_key)
-    click.secho("Successful upload.", fg="green")
+    try:
+        s3 = boto3.resource('s3')
+        s3.Bucket(s3_bucket).upload_file(os.path.join(package, "{}.zip".format(package)), s3_key)
+        click.secho("Upload successful.", fg="green")
+    except Exception as e:
+        click.secho("Upload failed: {}".format(e), fg="red")
 
 def _update_function(function_name, s3_bucket, s3_key):
     client = boto3.client("lambda")
@@ -189,8 +193,12 @@ def _add_defaults_to_config():
     try:
         with open(CONFIG['tf_file'], 'r') as f:
             tf = hcl.load(f)
-        runtime = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['runtime']
-        handler = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['handler'].split('.')[0]
+        try:
+            runtime = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['runtime']
+            handler = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['handler'].split('.')[0]
+        except KeyError as e:
+            click.secho("Lambda resource with name {} not found in .tf file.", fg="red")
+            sys.exit(1)
     except FileNotFoundError:
         return
     path = Path(".")
@@ -210,10 +218,25 @@ def _add_defaults_to_config():
                 if CONFIG['s3_bucket'] == None:
                     CONFIG['s3_bucket'] = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_bucket']
                 if CONFIG['s3_key'] == None:
-                    CONFIG['s3_key'] = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_key']
+                    CONFIG['s3_key'] = _determine_version(tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_key'], tf)
             except KeyError as e:
                 click.echo("Lambda name is not set or doesn't match the terraform file.")
                 sys.exit(1)
 
+def _determine_version(key, tf):
+    parsed_key = []
+    for x in key.strip('/').split('/'):
+        try:
+            match = re.match("\${var\.(.*)}", x)
+            if match is not None:
+                parsed_key.append(x.replace(x, tf['variable'][match.group(1)]['default']))
+            else:
+                parsed_key.append(x)
+        except KeyError as e:
+            click.secho("Failed to handle S3 Key terraform variables.", fg="red")
+            sys.exit(1)
+    key = '/'.join(parsed_key)
+    print(key)
+    return key
+    
 
-        
