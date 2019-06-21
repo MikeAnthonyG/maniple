@@ -40,7 +40,14 @@ In your terraform directory.
 
 ### Working with a function that is already created
 
+Download and package all requisite packages and deploy:
+
     $ maniple deploy
+
+Only update your script (ie don't re-download packages):
+
+     $ maniple deploy -u
+
 
 ### Updating multiple functions in the same terraform file
 
@@ -50,7 +57,7 @@ Check --help for each command to see more options.
 
 ### Install
 
-Go to the downloaded Maniple directory and run:
+Download Maniple and, in its downloaded directory, run:
 
     $ pip install --editable .
 
