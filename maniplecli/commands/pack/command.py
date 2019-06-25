@@ -76,10 +76,11 @@ def run_cli(create_package, invoke, update_script, update_function, libraries, u
             _update_script(CONFIG['package'], CONFIG['script']) 
         else:
             with ZipFile(CONFIG['package'], 'w', zipfile.ZIP_DEFLATED) as zip:
+                script = CONFIG['script']
                 if platform.system() == 'Windows':
                     zip.write(script, script.split("\\")[-1])    
                 else:
-                    zip.write(script, script.split("\\")[-1])  
+                    zip.write(script, script.split("/")[-1])  
     if create_package:
         _create_package(CONFIG['script'], CONFIG['requirements'], CONFIG['package'])
     if upload_package:
@@ -140,7 +141,7 @@ def _create_package(script, requirements, package):
         if platform.system() == 'Windows':
             zip.write(script, script.split("\\")[-1])    
         else:
-            zip.write(script, script.split("\\")[-1])  
+            zip.write(script, script.split("/")[-1])  
     click.secho("Package created.", fg="green")  
 
 def _update_script(package, script):  
@@ -154,7 +155,7 @@ def _update_script(package, script):
         if platform.system() == 'Windows':
             zip.write(script, script.split("\\")[-1])    
         else:
-            zip.write(script, script.split("\\")[-1])  
+            zip.write(script, script.split("/")[-1])  
     click.secho("Script updated.", fg="green")
     
 def _upload_package(s3_bucket, s3_key, package):
@@ -235,8 +236,7 @@ def _determine_version(key, tf):
         except KeyError as e:
             click.secho("Failed to handle S3 Key terraform variables.", fg="red")
             sys.exit(1)
-    key = '/'.join(parsed_key)
-    print(key)
-    return key
+    return '/'.join(parsed_key)
+    
     
 

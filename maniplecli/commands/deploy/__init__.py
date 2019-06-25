@@ -162,4 +162,4 @@ def _determine_version(key, tf):
         except KeyError as e:
             click.secho("Failed to handle S3 Key terraform variables.", fg="red")
             sys.exit(1)
-    return '/'.join(parsed_key)[1:]
+    return '/'.join(parsed_key)

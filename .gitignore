@@ -13,4 +13,4 @@ maniplecli/cli/command.pyc
 maniplecli/cli/main.pyc
 maniplecli/commands/__init__.pyc
 maniplecli/commands/config/__init__.pyc
-maniplecli/util/config_files/*
+
