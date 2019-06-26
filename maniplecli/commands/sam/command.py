@@ -2,6 +2,7 @@ import click
 import logging
 import json
 import os
+import sys
 import platform
 import subprocess
 

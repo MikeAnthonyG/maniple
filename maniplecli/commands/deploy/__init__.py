@@ -7,10 +7,11 @@ import sys
 import re
 import zipfile
 
-from pathlib    import Path
+from pathlib     import Path
 from zipfile     import ZipFile
 
 from maniplecli.commands.pack.command import _create_package, _update_script, _upload_package, _update_function
+from maniplecli.util.config_loader import ConfigLoader
 
 HELP_TEXT = '''
     Deploys your function by creating a package, uploading it, and notifying AWS.
@@ -36,10 +37,11 @@ def cli(all, update):
     run_cli(all, update)
 
 def run_cli(all, update):
+    global CONFIG
     if all:
         _deploy_all()
     else:
-        _add_defaults_to_config()
+        CONFIG = ConfigLoader.add_defaults(CONFIG)
         if update:
             _update()
         else:
@@ -57,7 +59,6 @@ def _update():
     _update_function(CONFIG['lambda_name'], CONFIG['s3_bucket'], CONFIG['s3_key'])
 
 def _deploy_all():
-    global CONFIG
     path = Path(".")
     files = os.listdir(path)
     try:
@@ -113,53 +114,3 @@ def _deploy_all():
     except KeyError as e:
         click.echo(e)
     click.secho("All functions uploaded.", fg='green')
-
-
-def _add_defaults_to_config():
-    global CONFIG
-    try:
-        with open(CONFIG['tf_file'], 'r') as f:
-            tf = hcl.load(f)
-        try:
-            runtime = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['runtime']
-            handler = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['handler'].split('.')[0]
-        except KeyError as e:
-            click.secho("Lambda resource with name {} not found in .tf file.", fg="red")
-            sys.exit(1)
-    except FileNotFoundError as e:
-        click.secho("Main terraform file not found!", fg="red")
-    path = Path(".")
-    files = os.listdir(path) 
-    for f in files:
-        if CONFIG['script'] == None:
-            if f[-2:] == 'js' and 'nodejs' in runtime and handler == f[:-3]:
-                CONFIG['script'] = Path(f).resolve().__str__()
-            if f[-2:] == 'py' and 'python' in runtime and handler == f[:-3]:
-                CONFIG['script'] = Path(f).resolve().__str__()
-        if f == 'requirements.txt' and CONFIG['requirements'] == None and 'python' in runtime:
-            CONFIG['requirements'] = Path(f).resolve().__str__()
-        if f == 'package.json' and CONFIG['requirements'] == None and 'nodejs' in runtime:
-            CONFIG['requirements'] = Path(f).resolve().__str__()
-        if f == CONFIG['tf_file']:
-            try:
-                if CONFIG['s3_bucket'] == None:
-                    CONFIG['s3_bucket'] = tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_bucket']
-                if CONFIG['s3_key'] == None:
-                    CONFIG['s3_key'] = _determine_version(tf['resource']['aws_lambda_function'][CONFIG['lambda_name']]['s3_key'], tf)
-            except KeyError as e:
-                click.echo("Lambda name is not set or doesn't match the terraform file.")
-                sys.exit(1)
-
-def _determine_version(key, tf):
-    parsed_key = []
-    for x in key.strip('/').split('/'):
-        try:
-            match = re.match("\${var\.(.*)}", x)
-            if match is not None:
-                parsed_key.append(x.replace(x, tf['variable'][match.group(1)]['default']))
-            else:
-                parsed_key.append(x)
-        except KeyError as e:
-            click.secho("Failed to handle S3 Key terraform variables.", fg="red")
-            sys.exit(1)
-    return '/'.join(parsed_key)
