@@ -6,6 +6,7 @@ import re
 
 from pathlib import Path
 
+
 class ConfigLoader():
 
     @staticmethod
@@ -17,8 +18,8 @@ class ConfigLoader():
                 runtime = tf['resource']['aws_lambda_function'][config['lambda_name']]['runtime']
                 handler = tf['resource']['aws_lambda_function'][config['lambda_name']]['handler'].split('.')[0]
             except KeyError as e:
-                click.secho("Lambda resource with name {} not found in .tf file.", fg="red")
-                sys.exit(1)
+                click.secho("Lambda resource with name {} not found in .tf file.\nSkipping auto-load...".format(config['lambda_name']), fg="red")
+                return config
         except FileNotFoundError as e:
             click.secho("Main terraform file not found!", fg="red")
         path = Path(".")
