@@ -173,7 +173,7 @@ class ConfigLoader():
                 if config['s3_bucket'] is None:
                     config['s3_bucket'] = tf['resource']['aws_lambda_function'][config['name']]['s3_bucket']
                 if config['s3_key'] is None:
-                    config['s3_key'] = ConfigLoader._determine_version(
+                    config['s3_key'] = ConfigLoader.determine_version(
                         tf['resource']['aws_lambda_function'][config['name']]['s3_key'],
                         tf)
             except KeyError:
@@ -182,7 +182,7 @@ class ConfigLoader():
         return config
 
     @staticmethod
-    def _determine_version(key, tf):
+    def determine_version(key, tf):
         parsed_key = []
         for x in key.strip('/').split('/'):
             try:
