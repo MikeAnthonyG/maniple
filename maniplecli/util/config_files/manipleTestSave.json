@@ -1,0 +1,9 @@
+{
+  "name": "manipleTestSave",
+  "package": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\maniplecli\\deployment_packages\\manipleTestSave",
+  "requirements": null,
+  "s3_bucket": null,
+  "s3_key": null,
+  "script": null,
+  "tf_file": "main.tf"
+}

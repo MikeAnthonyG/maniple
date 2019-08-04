@@ -12,9 +12,9 @@ variable "version" {
 }
 
 module "module_mult_folder_file" {
-    source                  = "../modules/module_name"
+    source                  = "../modules"
     function_method_name    = "module_mult_folder_file"
-    handler_function        = "mod_one.handler"
+    handler_function        = "module_mult_folder_file.handler"
     program_runtime         = "python3.6"
     timeout_in_seconds      = "900"
     arn_role                = "{data.aws_iam_role.lambda_role.arn}"
@@ -22,7 +22,7 @@ module "module_mult_folder_file" {
 }
 
 module "module_mult_folder_dir" {
-    source                  = "../modules/module_name"
+    source                  = "../modules"
     function_method_name    = "module_mult_folder_dir"
     handler_function        = "mod_two.handler"
     program_runtime         = "python3.6"

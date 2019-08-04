@@ -11,12 +11,12 @@ variable "version" {
     default = "1.0.0"
 }
 
-module "module_basic" {
-    source                  = "../modules/module_name"
-    function_method_name    = "module_basic"
+module "mod_basic" {
+    source                  = "../modules"
+    function_method_name    = "mod_basic"
     handler_function        = "mod_basic.handler"
     program_runtime         = "python3.6"
     timeout_in_seconds      = "900"
     arn_role                = "{data.aws_iam_role.lambda_role.arn}"
-    key                     = "maniple/test/${var.version}/module_basic.zip"
+    key                     = "maniple/test/${var.version}/mod_basic.zip"
 }

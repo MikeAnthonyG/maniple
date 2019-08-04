@@ -1,39 +1,67 @@
 import click
 import hcl
 import json
+import logging
 import os
-import typing
 import sys
 import re
 
 from pathlib import Path
 from typing import Dict
 
+from pprint import pprint
+
+logger = logging.getLogger('ConfigLoader')
+logger.setLevel(logging.DEBUG)
+
 
 class ConfigLoader():
 
     @staticmethod
     def load_config():
-        with open('config.json', 'r') as f:
-            return json.load(f)
+        try:
+            with open(os.path.join(Path(__file__).parent, 'config.json'), 'r') as f:
+                return json.load(f)
+        except json.decoder.JSONDecodeError:
+            click.echo('Config may be corrupted. Resetting...')
+            config = ConfigLoader.reset_config()
+            with open(os.path.join(Path(__file__).parent, 'config.json'), 'w') as f:
+                json.dump(config, f, indent=2, sort_keys=True)
+            logger.debug('Reset config file to default.')
+            sys.exit(0)
        
     @staticmethod
     def save_config(config):
-        with open('config.json', 'w') as f:
+        with open(os.path.join(Path(__file__).parent, 'config.json'), 'w') as f:
             json.dump(config, f, indent=2, sort_keys=True)
 
+    @staticmethod
+    def load_terraform(tf_file):
+        try:
+            with open(tf_file, 'r') as f:
+                return hcl.load(f)
+        except FileNotFoundError:
+            click.secho('Main terraform file not found.', fg='red')
+            sys.exit(1)
+
+    @staticmethod
+    def reset_config():
+        return {
+            'name': None,
+            'package': None,
+            'requirements': None,
+            's3_bucket': None,
+            's3_key': None,
+            'script': None,
+            'tf_file': 'main.tf'
+        }   
 
     @staticmethod
     def add_defaults(config=None):
         if config is None:
             config = ConfigLoader.load_config()
             
-        try:
-            with open(config['tf_file'], 'r') as f:
-                tf = hcl.load(f)
-        except FileNotFoundError:
-            click.secho('Main terraform file not found.', fg='red')
-            sys.exit(1)
+        tf = ConfigLoader.load_terraform(config['tf_file'])
             
         if config['name'] is None:
             possible_names = ConfigLoader.get_possible_resources(tf)
@@ -49,23 +77,27 @@ class ConfigLoader():
                         resource[0],
                         resource[1]
                     )
-            user_input = 0
-            user_input = click.prompt(str_, type=int)            
-            while user_input < 1 and user_input > len(possible_names):
-                try:
-                    for resource in possible_names:
-                        if user_input == resource[0]:
-                            config['name'] = resource[1]
-                except IndexError:
-                    click.echo('Input integer of the resource (1-{})'.format(
-                        len(possible_names)
-                    ))
-                    pass
-
+            # Exit if there is only one resource
+            if len(possible_names) == 1:
+                config['name'] = possible_names[0][1]
+            else:
+                user_input = 0
+                while user_input < 1 or user_input > len(possible_names):
+                    user_input = click.prompt(str_, type=int)
+                    try:
+                        for resource in possible_names:
+                            if user_input == resource[0]:
+                                config['name'] = resource[1]
+                    except IndexError:
+                        click.echo('Input integer of the resource (1-{})'.format(
+                            len(possible_names)
+                        ))
+                
         tf_vars = ConfigLoader.load_lambda_resource(config['name'], tf)
+        logger.debug('Variables to load to config: {}'.format(tf_vars))
         try:
-            runtime = tf_vars['resource']['aws_lambda_function'][config['name']]['runtime']
-            handler = tf_vars['resource']['aws_lambda_function'][config['name']]['handler'].split('.')[0]
+            runtime = tf_vars['runtime']
+            handler = tf_vars['handler'].split('.')[0]
         except KeyError:
             click.echo('Terraform file missing required fields:\nruntime\nhandler')
             sys.exit(1)
@@ -74,15 +106,16 @@ class ConfigLoader():
         path = Path('.')
         for x in path.iterdir():
             if x.is_dir():
-                config = ConfigLoader.handle_load_dirs(config, runtime, handler, tf_vars, x)
+                config = ConfigLoader.handle_load_dirs(config, handler, x)
             else:
-                config = ConfigLoader.handle_load_files(config, handler, x)
+                config = ConfigLoader.handle_load_files(config, runtime, handler, tf_vars, tf, x)
                    
         for key, value in config.items():
+            if key == 'package': continue
             if value is None:
                 click.secho('Warning: config variable {} not set!'.format(key))
         ConfigLoader.save_config(config)
-        return
+        return config
 
 
     @staticmethod
@@ -96,7 +129,7 @@ class ConfigLoader():
                 if source[0] == '/':
                     del source[0]
                 try:
-                    with open(os.path.join(os.getcwd(), source)) as f:
+                    with open(os.path.join(os.getcwd(), source, 'main.tf'), 'r') as f:
                         tf_module = hcl.load(f)
                     try:
                         if tf_module['resource']['aws_lambda_function'] is not None:
@@ -111,31 +144,56 @@ class ConfigLoader():
         except KeyError:
             pass
         try:
-            for name, values in tf['aws_lambda_function'].items():
+            for name, values in tf['resource']['aws_lambda_function'].items():
                 fns.append((count, name, 'resource'))
                 count += 1 
         except KeyError:
-            click.secho('No lambda resources in terraform file.', fg='red')
+            pass
         return fns
 
     @staticmethod
     def load_lambda_resource(name, tf):
         try:
-            return tf['resource']['aws_lambda_function'][name]
+            lambda_resource = tf['resource']['aws_lambda_function'][name]
+            return lambda_resource
         except KeyError:  # Module
             try:
-                source = tf['module'][name]['source']
-                return ConfigLoader._load_module_source(name, source)
+                source_vars = tf['module'][name]
+                resource_vars = ConfigLoader._load_module_source(
+                    name,
+                    tf['module'][name]['source'])
+                module_resource = None
+                tf_vars = {}
+                for lambda_key in resource_vars.keys():
+                    for key in source_vars.keys():
+                        if key in resource_vars[lambda_key]['function_name']:
+                            module_resource = resource_vars[lambda_key]
+                            break
+
+                if module_resource is None:
+                    click.secho('Unable to determine lambda resource in module',
+                                fg='red')
+                    sys.exit(1)
+
+                for tf_var_key in module_resource.keys():
+                    for source_key, source_value in source_vars.items():
+                        if source_key in module_resource[tf_var_key]:
+                            tf_vars[tf_var_key] = source_value
+
+                # Return dictionary with the keys updated from tf_vars
+                return dict(module_resource, **tf_vars)
             except KeyError:
-                click.echo('Source variable in module.')
+                logger.debug('Can\'t find module source')
+                click.echo('Can\'t find module source.')
 
     @staticmethod
     def _load_module_source(name, source):
         try:
-            with open(os.path.join(os.getcwd(), source)) as f:
+            with open(os.path.join(os.getcwd(), source, 'main.tf')) as f:
                 tf_module = hcl.load(f)
             try:
-                return tf_module['resource']['aws_lambda_function'][name]
+                # Each variable needs to fit the lambda module
+                return tf_module['resource']['aws_lambda_function']
             except KeyError:
                 click.secho('No lambda resource in module with {}'.format(name))
         except FileNotFoundError:
@@ -147,36 +205,37 @@ class ConfigLoader():
     def handle_load_dirs(config, handler, dir_):
         # Check if handler script exists in directory
         for f in dir_.iterdir():
-            if f.split('.')[0] == handler:
-                config['script'] = dir_
+            if f.is_file():
+                possible_script = f.name
+                if possible_script.split('.')[0] == handler:
+                    config['script'] = dir_.resolve().__str__()
         return config
 
     @staticmethod
-    def handle_load_files(config, runtime, handler, tf, file_):
-        filename = file_.split('.')
+    def handle_load_files(config, runtime, handler, tf_vars, tf, file_):
+        filename = file_.name.split('.')
         if config['script'] is None:
             if filename[-1] == 'js' and 'nodejs' in runtime and handler == filename[0]:
-                config['script'] = Path(file_).resolve().__str__()
+                config['script'] = file_.resolve().__str__()
             if filename[-1] == 'py' and 'python' in runtime and handler == filename[0]:
-                config['script'] = Path(file_).resolve().__str__()
-        elif filename[-1] == 'txt' or filename[-1] == 'json':
-            if config['requirements'] is None:
-                if file_ == 'requirements.txt' or file_ == 'package.json':
-                    config['requirements'] = Path(file_).resolve().__str__()
-                if config['name'] == filename[0]:
-                    config['requirements'] = Path(file_).resolve().__str__()
-            if filename[0] == config['name']:
-                # Override config if it is loaded with requirements.txt
-                config['requirements'] = Path(file_).resolve().__str__()
-        if file_ == config['tf_file']:
+                config['script'] = file_.resolve().__str__()
+        if filename[-1] == 'txt' or filename[-1] == 'json':
+            if config['name'] == filename[0]:
+                config['requirements'] = file_.resolve().__str__()
+            if file_.name == 'requirements.txt' and 'python' in runtime:
+                config['requirements'] = file_.resolve().__str__()
+            if file_.name == 'package.json' and 'nodejs' in runtime:
+                config['requirements'] = file_.resolve().__str__()
+        if file_.name == config['tf_file']:
             try:
                 if config['s3_bucket'] is None:
-                    config['s3_bucket'] = tf['resource']['aws_lambda_function'][config['name']]['s3_bucket']
+                    config['s3_bucket'] = tf_vars['s3_bucket']
                 if config['s3_key'] is None:
                     config['s3_key'] = ConfigLoader.determine_version(
-                        tf['resource']['aws_lambda_function'][config['name']]['s3_key'],
+                        tf_vars['s3_key'],
                         tf)
             except KeyError:
+                logger.debug('Missing S3 bucket or key.')
                 click.echo('S3 Bucket or S3 Key aren\'t set in the terraform file.')
                 sys.exit(1)
         return config
@@ -192,6 +251,7 @@ class ConfigLoader():
                 else:
                     parsed_key.append(x)
             except KeyError:
+                logger.debug('Unable to set proper version to files.')
                 click.secho('Failed to handle S3 Key terraform variables.', fg='red')
                 sys.exit(1)
         return '/'.join(parsed_key)

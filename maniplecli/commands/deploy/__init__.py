@@ -1,19 +1,21 @@
 import click
 import hcl
 import json
+import logging
 import os
 import shutil
-import subprocess
 import sys
-import platform
 
 from pathlib import Path
-from subprocess import Popen, PIPE
 
 from maniplecli.commands.pack.command import (_create_package, _update_script,
                                               _upload_package, _update_function)
 from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
 
 HELP_TEXT = """
     Deploys your function by creating a package, uploading it, and notifying 
@@ -23,17 +25,18 @@ HELP_TEXT = """
     Deploy your function
     $ maniple deploy \n
     \b
-    Deploys all functions in your main.tf file. All functions will have their 
-    packages made from requirements.txt or package.json
+    Deploys all functions in your main.tf file.
     $ maniple deploy -a \n
     \b
+    Deploy all functions and run terraform apply
+    $ maniple deploy -a -n \n
+    \b
     Only updates the script of the function and deploys it.
-    $ maniple deploy -s
+    $ maniple deploy -u \n
+    \b
+    Deploy lambda and use terraform to create the resource (run terraform apply)
+    $ maniple deploy -n    
 """
-
-with open(os.path.join(os.path.dirname(__file__), '..', '..', '..',
-                       'config.json'), 'r') as f:
-    CONFIG = json.load(f)
 
 
 @click.command('deploy', help=HELP_TEXT, short_help='Deploy Lambda functions.')
@@ -51,102 +54,83 @@ def cli(all, update, new_function):
 
 
 def run_cli(all, update, new_function):
-    global CONFIG
+    config = ConfigLoader.load_config()
     if all:
-        _deploy_all()
+        _deploy_all(new_function)
     else:
-        CONFIG = ConfigLoader.add_defaults(CONFIG)
         if update:
-            _update()
+            _update(config)
         elif new_function:
-            _new_function()
+            _new_function(config)
         else:
-            _deploy()
+            _deploy(config)
     sys.exit(0)
 
 
-def _deploy():
-    _create_package(CONFIG['script'], CONFIG['requirements'], CONFIG['package'])
-    _upload_package(CONFIG['s3_bucket'], CONFIG['s3_key'], CONFIG['package'])
-    _update_function(CONFIG['lambda_name'], CONFIG['s3_bucket'], CONFIG['s3_key'])
+def _deploy(config):
+    _create_package(config['script'], config['requirements'], config['package'])
+    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
+    _update_function(config['name'], config['s3_bucket'], config['s3_key'])
 
 
-def _update():
-    _update_script(CONFIG['package'], CONFIG['script'])
-    _upload_package(CONFIG['s3_bucket'], CONFIG['s3_key'], CONFIG['package'])
-    _update_function(CONFIG['lambda_name'], CONFIG['s3_bucket'], CONFIG['s3_key'])
+def _update(config):
+    _update_script(config['package'], config['script'])
+    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
+    _update_function(config['name'], config['s3_bucket'], config['s3_key'])
 
 
-def _new_function():
-    _create_package(CONFIG['script'], CONFIG['requirements'], CONFIG['package'])
-    _upload_package(CONFIG['s3_bucket'], CONFIG['s3_key'], CONFIG['package'])
+def _new_function(config):
+    _create_package(config['script'], config['requirements'], config['package'])
+    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
 
     terraform_commands = ['terraform init', 'terraform apply -auto-approve']
     for cmd in terraform_commands:
         return_code, out, err = Shell.run(cmd, os.getcwd())
         if return_code == 0:
             click.secho('{} ran successfully.'.format(cmd), fg='green')
-            click.echo(out)
+            logger.debug(out)
         else:
             click.secho('{} failed.'.format(cmd), fg='red')
-            click.echo(err)
+            logger.debug(err)
             sys.exit(1)
 
 
-def _deploy_all():
-    path = Path('.')
-    files = os.listdir(path)
-    try:
-        with open(CONFIG['tf_file'], 'r') as f:
-            tf = hcl.load(f)
-    except FileNotFoundError:
-        click.secho('Main terraform not found!', fg='red')
-    
-    try:
-        functions = tf['resource']['aws_lambda_function']
-        for name, values in functions.items():
-            handler = values['handler'].split('.')[0]
-            if 'python' in values['runtime']:
-                runtime = 'python'
-            else:
-                runtime = 'nodejs'
-            lambda_name = values['function_name']
-            package = Path(os.path.join(os.path.dirname(__file__), '..', '..',
-                                        'deployment_packages', lambda_name))
-            try:
-                os.makedirs(package)
-            except FileExistsError:
-                shutil.rmtree(package)
-                os.makedirs(package)
-            package = package.resolve().__str__()
-            try:
-                s3_bucket = values['s3_bucket']
-                s3_key    = values['s3_key']
-            except KeyError as e:
-                click.secho('No S3 bucket or keys found in main.tf', fg='red')
-            for f in files:
-                if '.py' in f and runtime == 'python':
-                    if handler == f[:-3]:
-                        script = Path(f).resolve().__str__()
-                        try:
-                            requirements = Path('./requirements.txt').resolve().__str__()
-                        except FileNotFoundError:
-                            click.echo('No requirements.txt found.\nCancelling deployment.', fg='red')
-                            sys.exit(1)
-                elif '.js' in f and runtime == 'nodejs':
-                    if handler == f[:-3]:
-                        script = Path(f).resolve().__str__()
-                        try:
-                            requirements = Path('./package.json').resolve().__str__()
-                        except FileNotFoundError as e:
-                            click.echo('No package.json found.\nCancelling deployment.', fg='red')
-                            sys.exit(1)
-                else:
-                    continue
+def _deploy_all(apply_flag=False):
+    config = ConfigLoader.load_config()
+    resources_to_deploy = ConfigLoader.get_possible_resources(
+        ConfigLoader.load_terraform(config['tf_file'])
+    )
+    logger.debug('Resources to deploy: {}'.format(
+        resources_to_deploy
+    ))
+    for resource in resources_to_deploy:
+        # resource = (int_value, name, resource_or_module)
+        temp_config = ConfigLoader.reset_config()
+        temp_config['name'] = resource[1]
+        temp_config = ConfigLoader.add_defaults(temp_config)
+        _create_package(
+            temp_config['script'],
+            temp_config['requirements'],
+            temp_config['package'])
+        _upload_package(
+            temp_config['s3_bucket'],
+            temp_config['s3_key'],
+            temp_config['package'])
+        logger.debug('Created and uploaded {} resource'.format(temp_config['name']))
+        if apply_flag is False:
+            _update_function(
+                temp_config['name'],
+                temp_config['s3_bucket'],
+                temp_config['s3_key'])
 
-            _create_package(script, requirements, package)
-            _upload_package(s3_bucket, s3_key, package)
-            _update_function(lambda_name, s3_bucket, s3_key)           
-    except KeyError as e:
-        click.echo(e)
-    click.secho('All functions uploaded.', fg='green')
+    if apply_flag:
+        terraform_commands = ['terraform init', 'terraform apply -auto-approve']
+        for cmd in terraform_commands:
+            return_code, out, err = Shell.run(cmd, os.getcwd())
+            if return_code == 0:
+                click.secho('{} ran successfully.'.format(cmd), fg='green')
+                logger.debug(out)
+            else:
+                click.secho('{} failed.'.format(cmd), fg='red')
+                logger.debug(err)
+                sys.exit(1)

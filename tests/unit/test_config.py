@@ -1,13 +1,8 @@
-import click
-import json
 import os
 
 from click.testing import CliRunner
-from pyfakefs import fake_filesystem_unittest
 from unittest import TestCase
-from mock import patch
 from maniplecli.commands.config import cli
-from pathlib import Path
 from maniplecli.util.config_loader import ConfigLoader
 
 
@@ -15,7 +10,7 @@ class TestConfigCommand(TestCase):
     def setUp(self):
         self.runner = CliRunner()
 
-    def get_config(self, attribute):
+    def get_config(self):
         return ConfigLoader.load_config()
 
     # Test setting values
@@ -35,14 +30,16 @@ class TestConfigCommand(TestCase):
 
     # Test functionality
     def test_new_name_wipe_config(self):
+        self.runner.invoke(cli, ['--s3-bucket', 'bucket'])
+        config_ini = self.get_config()
+        # Ensure there is something to wipe
+        self.assertEquals(config_ini['s3_bucket'], 'bucket')
         result = self.runner.invoke(cli, ['--name', 'new_name'])
         config = self.get_config()
-        # Checks to see that value is update
-        self.assertEquals(config['s3_bucket'], 's3-bucket-name')
         self.assertEquals(result.exit_code, 0)
         self.assertEquals(config['name'], 'new_name')
         for key, items in config.items():
-            if key not in ['name', 'tf_file']:
+            if key not in ['name', 'tf_file','package']:
                 self.assertEquals(config[key], None)
 
     def test_replace(self):
@@ -54,23 +51,21 @@ class TestConfigCommand(TestCase):
                                               '--script', 'wrongScript.py'])
             config = self.get_config()
             self.assertEquals(result.exit_code, 0)
-            self.assertEquals(config['lambda_name'], 'wrongName')
+            self.assertEquals(config['name'], 'wrongName')
             self.runner.invoke(cli, ['-rep', 'wrong', 'right'])
-            self.assertEquals(config['lambda_name'], 'rightName')
+            config = self.get_config()
+            self.assertEquals(config['name'], 'rightName')
             self.assertTrue('rightScript' in config['script'])
     
 
     def test_save(self):
-        return
+        self.runner.invoke(cli, ['--name', 'manipleTestSave'])
+        result = self.runner.invoke(cli, ['-save', 'manipleTestSave'])
+        self.assertEquals(result.exit_code, 0)
+        
 
     def test_open(self):
-        #change lambda name then open from save
-        return
-
-    def test_load_module(self):
-        return
-
-
-    def test_load_resource(self):
-        return
-
+        self.runner.invoke(cli, ['--name', 'initiateConfigWipe'])
+        self.runner.invoke(cli, ['-open', 'manipleTestSave'])
+        config = self.get_config()
+        self.assertEquals(config['name'], 'manipleTestSave')

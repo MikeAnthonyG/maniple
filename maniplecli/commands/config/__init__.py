@@ -200,7 +200,7 @@ def run_file_options(**kwargs):
                 click.secho('Improper file name or file doesn\'t exist.', fg='red')  
                 sys.exit(1)
 
-    ConfigLoader.save_config()
+    ConfigLoader.save_config(config)
 
 
 def run_general_options(get, clear, replace, save, open_, load):
