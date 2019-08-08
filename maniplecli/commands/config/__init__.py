@@ -181,10 +181,7 @@ def run_file_options(**kwargs):
                                                  '..', '..',
                                                  'deployment_packages',
                                                  filepath))
-                try:
-                    os.makedirs(_package_dir)
-                except FileExistsError:
-                    shutil.rmtree(_package_dir)
+                if _package_dir.exists() is False:
                     os.makedirs(_package_dir)
                 config['package'] = _package_dir.resolve().__str__()
                 config['name'] = filepath

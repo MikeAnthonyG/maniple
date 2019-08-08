@@ -1,9 +1,0 @@
-{
-  "name": null,
-  "package": null,
-  "requirements": null,
-  "s3_bucket": null,
-  "s3_key": null,
-  "script": null,
-  "tf_file": "main.tf"
-}

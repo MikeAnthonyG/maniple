@@ -17,7 +17,7 @@ module "module_mult_one" {
     handler_function        = "module_mult_one.handler"
     program_runtime         = "python3.6"
     timeout_in_seconds      = "900"
-    arn_role                = "{data.aws_iam_role.lambda_role.arn}"
+    arn_role                = "${data.aws_iam_role.lambda_role.arn}"
     key                     = "maniple/test/${var.version}/module_mult_one.zip"
 }
 
@@ -27,6 +27,6 @@ module "module_mult_two" {
     handler_function        = "mod_two.handler"
     program_runtime         = "python3.6"
     timeout_in_seconds      = "900"
-    arn_role                = "{data.aws_iam_role.lambda_role.arn}"
+    arn_role                = "${data.aws_iam_role.lambda_role.arn}"
     key                     = "maniple/test/${var.version}/module_mult_two.zip"
 }

@@ -1,19 +1,14 @@
 import click
-import hcl
-import json
 import logging
 import os
-import shutil
 import sys
-
-from pathlib import Path
 
 from maniplecli.commands.pack.command import (_create_package, _update_script,
                                               _upload_package, _update_function)
 from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
@@ -34,8 +29,11 @@ HELP_TEXT = """
     Only updates the script of the function and deploys it.
     $ maniple deploy -u \n
     \b
-    Deploy lambda and use terraform to create the resource (run terraform apply)
-    $ maniple deploy -n    
+    Deploy lambda and use terraform to create the resource (ie run terraform apply)
+    $ maniple deploy -n \n
+    \b
+    Deploy all lambda resources in a file with user terraform file name (defaults to 'main.tf')
+    $ maniple deploy -a -n -t my_resources.tf
 """
 
 
@@ -49,56 +47,51 @@ HELP_TEXT = """
 @click.option('-n', '--new-function',
               help='Deploys a new AWS resource with Terraform Apply',
               is_flag=True, default=False)
-def cli(all, update, new_function):
-    run_cli(all, update, new_function)
+@click.option('-t', '--tf_file',
+              help='Name of terraform file (Default=main.tf)',
+              default='main.tf')
+def cli(all, update, new_function, tf_file):
+    run_cli(all, update, new_function, tf_file)
 
 
-def run_cli(all, update, new_function):
-    config = ConfigLoader.load_config()
+def run_cli(all, update, new_function, tf_file):
     if all:
-        _deploy_all(new_function)
+        _deploy_all(new_function, tf_file)
     else:
         if update:
-            _update(config)
+            _update()
         elif new_function:
-            _new_function(config)
+            _new_function()
         else:
-            _deploy(config)
+            _deploy()
     sys.exit(0)
 
 
-def _deploy(config):
+def _deploy():
+    config = ConfigLoader.add_defaults(ConfigLoader.load_config())
     _create_package(config['script'], config['requirements'], config['package'])
     _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
     _update_function(config['name'], config['s3_bucket'], config['s3_key'])
 
 
-def _update(config):
+def _update():
+    config = ConfigLoader.add_defaults(ConfigLoader.load_config())
     _update_script(config['package'], config['script'])
     _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
     _update_function(config['name'], config['s3_bucket'], config['s3_key'])
 
 
-def _new_function(config):
+def _new_function():
+    config = ConfigLoader.add_defaults(ConfigLoader.load_config())
     _create_package(config['script'], config['requirements'], config['package'])
     _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
-
-    terraform_commands = ['terraform init', 'terraform apply -auto-approve']
-    for cmd in terraform_commands:
-        return_code, out, err = Shell.run(cmd, os.getcwd())
-        if return_code == 0:
-            click.secho('{} ran successfully.'.format(cmd), fg='green')
-            logger.debug(out)
-        else:
-            click.secho('{} failed.'.format(cmd), fg='red')
-            logger.debug(err)
-            sys.exit(1)
+    _terraform_apply()
 
 
-def _deploy_all(apply_flag=False):
-    config = ConfigLoader.load_config()
+def _deploy_all(apply_flag, tf_file):
+
     resources_to_deploy = ConfigLoader.get_possible_resources(
-        ConfigLoader.load_terraform(config['tf_file'])
+        ConfigLoader.load_terraform(tf_file)
     )
     logger.debug('Resources to deploy: {}'.format(
         resources_to_deploy
@@ -124,13 +117,17 @@ def _deploy_all(apply_flag=False):
                 temp_config['s3_key'])
 
     if apply_flag:
-        terraform_commands = ['terraform init', 'terraform apply -auto-approve']
-        for cmd in terraform_commands:
-            return_code, out, err = Shell.run(cmd, os.getcwd())
-            if return_code == 0:
-                click.secho('{} ran successfully.'.format(cmd), fg='green')
-                logger.debug(out)
-            else:
-                click.secho('{} failed.'.format(cmd), fg='red')
-                logger.debug(err)
-                sys.exit(1)
+        _terraform_apply()
+
+
+def _terraform_apply():
+    terraform_commands = ['terraform init', 'terraform apply -auto-approve']
+    for cmd in terraform_commands:
+        return_code, out, err = Shell.run(cmd, os.getcwd())
+        if return_code == 0:
+            click.secho('{} ran successfully.'.format(cmd), fg='green')
+            logger.debug(out)
+        else:
+            click.secho('{} failed.'.format(cmd), fg='red')
+            logger.debug(err)
+            sys.exit(1)

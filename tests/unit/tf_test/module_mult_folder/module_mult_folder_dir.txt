@@ -1,1 +1,1 @@
-
+jsonpickle==1.0

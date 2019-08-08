@@ -9,11 +9,12 @@ import re
 from pathlib import Path
 from typing import Dict
 
-from pprint import pprint
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('ConfigLoader')
-logger.setLevel(logging.DEBUG)
 
+logger.setLevel(logging.DEBUG)
 
 class ConfigLoader():
 
@@ -54,7 +55,7 @@ class ConfigLoader():
             's3_key': None,
             'script': None,
             'tf_file': 'main.tf'
-        }   
+        }  
 
     @staticmethod
     def add_defaults(config=None):
@@ -92,16 +93,29 @@ class ConfigLoader():
                         click.echo('Input integer of the resource (1-{})'.format(
                             len(possible_names)
                         ))
-                
+            
         tf_vars = ConfigLoader.load_lambda_resource(config['name'], tf)
         logger.debug('Variables to load to config: {}'.format(tf_vars))
         try:
             runtime = tf_vars['runtime']
             handler = tf_vars['handler'].split('.')[0]
-        except KeyError:
+        except KeyError as e:
             click.echo('Terraform file missing required fields:\nruntime\nhandler')
+            logger.error('{}: Terraform file missing either runtime or handler'.format(e))
             sys.exit(1)
+        except TypeError as e:
+            logger.error('User tried to -load from different config. \n{}'.format(e))
+            click.echo('Config file doesn\'t match directory.')
+            user_input = click.confirm('Reset config and load?', abort=True)
+            return ConfigLoader.add_defaults(ConfigLoader.reset_config())
 
+        # Have to find the package if it doesn't exist
+        package_dir = Path(os.path.join(
+            Path(__file__).parent,
+            '..', '..', 'deployment_packages', config['name']))
+        if package_dir.exists() is False:
+            os.makedirs(package_dir)
+        config['package'] = package_dir.resolve().__str__()
         # Load files and directories
         path = Path('.')
         for x in path.iterdir():
@@ -111,10 +125,12 @@ class ConfigLoader():
                 config = ConfigLoader.handle_load_files(config, runtime, handler, tf_vars, tf, x)
                    
         for key, value in config.items():
-            if key == 'package': continue
             if value is None:
                 click.secho('Warning: config variable {} not set!'.format(key))
+                logger.debug('add_defaults failed to add {}: {}'.format(key, value))
+                sys.exit(1)
         ConfigLoader.save_config(config)
+        logger.debug('Default config loaded as:\n{}'.format(config))
         return config
 
 
@@ -255,3 +271,61 @@ class ConfigLoader():
                 click.secho('Failed to handle S3 Key terraform variables.', fg='red')
                 sys.exit(1)
         return '/'.join(parsed_key)
+
+    @staticmethod
+    def get_runtime(config=None):
+        if config is None:
+            config = ConfigLoader.load_config()
+            
+        tf = ConfigLoader.load_terraform(config['tf_file'])
+            
+        if config['name'] is None:
+            possible_names = ConfigLoader.get_possible_resources(tf)
+            str_ = 'Select resource to deploy:\n'
+            for resource in possible_names:
+                if resource[2] == 'module':
+                    str_ = str_ + '{}: {} (module)\n'.format(
+                        resource[0],
+                        resource[1]
+                    )
+                else:
+                    str_ = str_ + '{}: {}\n'.format(
+                        resource[0],
+                        resource[1]
+                    )
+            # Exit if there is only one resource
+            if len(possible_names) == 1:
+                config['name'] = possible_names[0][1]
+            else:
+                user_input = 0
+                while user_input < 1 or user_input > len(possible_names):
+                    user_input = click.prompt(str_, type=int)
+                    try:
+                        for resource in possible_names:
+                            if user_input == resource[0]:
+                                config['name'] = resource[1]
+                    except IndexError:
+                        click.echo('Input integer of the resource (1-{})'.format(
+                            len(possible_names)
+                        ))
+            # Have to find the package if it doesn't exist
+            package_dir = Path(os.path.join(
+                Path(__file__).parent,
+                '..', '..', 'deployment_packages', config['name']))
+            if package_dir.exists() is False:
+                os.makedirs(package_dir)
+            config['package'] = package_dir.resolve().__str__()
+            
+        tf_vars = ConfigLoader.load_lambda_resource(config['name'], tf)
+        logger.debug('Variables to load to config: {}'.format(tf_vars))
+
+        try:
+            return tf_vars['runtime']
+        except KeyError:
+            click.echo('Terraform file missing required fields:\nruntime\nhandler')
+            sys.exit(1)
+        except TypeError as e:
+            logger.error("{}: User tried to load config from another working directory")
+            click.echo('Load correct resource/module with \'maniple config -n resource_name\' or \'maniple config -c\'')
+            sys.exit(1)
+        return None

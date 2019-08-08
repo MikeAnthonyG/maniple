@@ -21,7 +21,8 @@ class TestConfigLoader(TestCase):
         self.assertEquals(config['s3_bucket'], bucket)
         self.assertEquals(config['s3_key'], key)
         self.assertEquals(config['script'], script)
-        
+        self.assertTrue(Path(config['package']).exists())
+            
     def test_basic(self):
         os.chdir(self.file_dir.joinpath('tf_test', 'basic'))
         self.runner.invoke(cli, ['--name', 'basic'])
@@ -98,7 +99,7 @@ class TestConfigLoader(TestCase):
             'aws-lambda-project-code',
             'maniple/test/1.0.0/fn_two.zip',
             Path('fn_two.py').resolve().__str__()
-        )        
+        )
 
     def test_basic_multiple_no_name(self):
         os.chdir(self.file_dir.joinpath('tf_test', 'basic_multiple'))

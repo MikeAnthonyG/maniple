@@ -1,6 +1,7 @@
 venv
 maniplecli/deployment_packages/test
 maniplecli/deployment_packages/test.zip
+maniplecli/deployment_packages/
 maniple.egg-info
 .vscode
 __pycache__
