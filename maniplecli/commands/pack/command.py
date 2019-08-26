@@ -1,23 +1,23 @@
 import boto3
 import click
-import hcl
 import logging
 import json
 import os
 import platform
 import shutil
-import subprocess
 import sys
-import re
 import zipfile
 
 from maniplecli.util.lambda_packages import lambda_packages
+
 from maniplecli.util.config_loader import ConfigLoader
+from maniplecli.util.shell import Shell
+from maniplecli.util.package_downloader import PackageDownloader
 from pathlib import Path
-from subprocess import PIPE
-from subprocess import Popen
 from zipfile import ZipFile
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 HELP_TEXT = """
 Use this command to zip site-packages, update deployment packages with new code, create deployment packages, send to s3\n
@@ -43,10 +43,6 @@ to None and then use --update-script and --upload-package
 $ maniple config -r None
 $ maniple pack -us -up
 """
-
-with open(os.path.join(os.path.dirname(__file__), '..', '..', '..',
-                       'config.json'), 'r') as f:
-    CONFIG = json.load(f)
 
 
 def list_libraries(ctx, param, value):
@@ -84,101 +80,47 @@ def cli(create_package, invoke, update_script, update_function, libraries,
 def run_cli(create_package, invoke, update_script, update_function, libraries,
             upload_package):
    
-    global CONFIG
-    CONFIG = ConfigLoader.add_defaults(CONFIG)
+    config = ConfigLoader.add_defaults()
 
     if update_script:
-        if CONFIG['requirements'] is not None:
-            _update_script(CONFIG['package'], CONFIG['script'])
-        else:
-            with ZipFile(CONFIG['package'], 'w', zipfile.ZIP_DEFLATED) as zip:
-                script = CONFIG['script']
-                if platform.system() == 'Windows':
-                    zip.write(script, script.split('\\')[-1])   
-                else:
-                    zip.write(script, script.split('/')[-1]) 
+        _update_script(config['package'], config['script'])
     if create_package:
-        _create_package(CONFIG['script'], CONFIG['requirements'], CONFIG['package'])
+        _create_package(config['script'], config['requirements'], config['package'])
     if upload_package:
         click.echo('Uploading file to s3 bucket...')
-        _upload_package(CONFIG['s3_bucket'], CONFIG['s3_key'], CONFIG['package'])
+        _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
     if update_function:
         click.echo('Updating function on AWS...')
-        click.echo(_update_function(CONFIG['lambda_name'], CONFIG['s3_bucket'],
-                                    CONFIG['s3_key']))
+        click.echo(_update_function(config['lambda_name'], config['s3_bucket'],
+                                    config['s3_key']))
     if invoke:
         click.echo('Invoking lambda...')
-        _invoke(CONFIG['lambda_name'])
+        _invoke(config['lambda_name'])
 
     sys.exit(0)
 
 
 def _create_package(script, requirements, package):
-    if requirements is None:
-        raise TypeError('Config not set or requirements file not in folder: requirements, package')
     try:
-        os.makedirs(CONFIG['package'])
+        logger.debug('Attempting to make package dir at {}'.format(package))        
+        os.makedirs(package)
+        logger.debug('Made package dir at {}'.format(package))
     except FileExistsError:
-        shutil.rmtree(CONFIG['package'])
-        os.makedirs(CONFIG['package'])
+        shutil.rmtree(package)
+        os.makedirs(package)
+        logger.debug('Deleted previous dir and made a new one'.format(package))
 
-    if 'requirements.txt' in requirements:
-        subprocess.call([
-            'pip',
-            'install',
-            '--target={}'.format(package),
-            '-r',
-            requirements
-        ])
-    elif 'package.json' in requirements:
-        with open(requirements, 'r') as f:
-            dependencies = json.load(f)
-        for key, value in dependencies['dependencies'].items():
-            try:
-                subprocess.call([
-                    'npm',
-                    '--prefix',
-                    os.path.abspath(package),
-                    'install',
-                    key
-                ], shell=True)
-            except Exception as e:
-                click.echo(e)
-                sys.exit(1)
-    else:
-        if Path(requirements).is_file() is False:
-            click.secho('Requirements file is incorrect. Should be requirements.txt or package.json')
-            sys.exit(1)
+    PackageDownloader.download_packages(script, requirements, package)
 
-    with ZipFile(os.path.join(package, '{}.zip'.format(package)), 'w',
-                 zipfile.ZIP_DEFLATED) as zip:
-        for dirname, subdirs, files in os.walk(package):
-            for filename in files:
-                abs_name = os.path.abspath(os.path.join(dirname, filename))
-                arc_name = abs_name[len(package) + 1:]
-                zip.write(abs_name, arc_name)
-        if platform.system() == 'Windows':
-            zip.write(script, script.split('\\')[-1])    
-        else:
-            zip.write(script, script.split('/')[-1])  
+    _zip_files()
     click.secho('Package created.', fg='green')  
 
 
 def _update_script(package, script):  
-    with ZipFile(os.path.join(package, '{}.zip'.format(package)), 'w',
-                 zipfile.ZIP_DEFLATED) as zip:
-        for dirname, subdirs, files in os.walk(package):
-            for filename in files:
-                abs_name = os.path.abspath(os.path.join(dirname, filename))
-                arc_name = abs_name[len(package) + 1:]
-                zip.write(abs_name, arc_name)
-        if platform.system() == 'Windows':
-            zip.write(script, script.split('\\')[-1])    
-        else:
-            zip.write(script, script.split('/')[-1])  
+    _zip_files()
     click.secho('Script updated.', fg='green')
 
-   
+
 def _upload_package(s3_bucket, s3_key, package):
     try:
         s3 = boto3.resource('s3')
@@ -211,3 +153,28 @@ def _invoke(lambda_name):
         click.echo('View more logs with: maniple sam -w')
     except client.exceptions.ResourceNotFoundError as e:
         click.secho(e, fg='red') 
+
+
+def _zip_files():
+    config = ConfigLoader.load_config()
+
+    with ZipFile(os.path.join(config['package'], '{}.zip'.format(config['package'])), 'w',
+                 zipfile.ZIP_DEFLATED) as zip:
+        # Zip packages from requirements
+        for dirname, subdirs, files in os.walk(config['package']):
+            for filename in files:
+                abs_name = os.path.abspath(os.path.join(dirname, filename))
+                arc_name = abs_name[len(config['package']) + 1:]
+                logger.debug('Zipped {} : {}'.format(abs_name, arc_name))
+                zip.write(abs_name, arc_name)
+
+        script = Path(config['script'])
+        if script.is_dir():
+            for dirname, subdirs, files in os.walk(config['script']):
+                for filename in files:
+                    abs_name = os.path.abspath(os.path.join(dirname, filename))
+                    arc_name = abs_name[len(config['script']) + 1:]
+                    logger.debug('Zipped {} : {}'.format(abs_name, arc_name))
+                    zip.write(abs_name, arc_name)
+        else:
+            zip.write(config['script'], script.name)

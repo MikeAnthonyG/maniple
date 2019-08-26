@@ -54,46 +54,54 @@ Load a config from directory
 $ maniple config -load
 """
 
-with open(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.json'), 'r') as f:
-    CONFIG = json.load(f)
 
 def get_config(ctx, param, value):
     if value is False:
         return
 
-    for key, value in CONFIG.items():
+    config = ConfigLoader.load_config()
+    for key, value in config.items():
         if key == 'package':
             continue
         elif value is not None:
-            click.echo('{}{}: {}'.format(click.style(key,fg='green'), (13-len(key))*' ', value))
+            click.echo('{}{}: {}'.format(click.style(key, fg='green'),
+                                         (13-len(key))*' ', value))
         else:
-            click.echo('{}{}: {}'.format(click.style(key,fg='red'), (13-len(key))*' ', value))
+            click.echo('{}{}: {}'.format(click.style(key, fg='red'),
+                                         (13-len(key))*' ', value))
     ctx.exit()
+
 
 def clear_config(ctx, param, value):
     if value is False:
         return
 
-    click.confirm('Are you sure you want to clear your configuration?', abort=True)
+    click.confirm('Are you sure you want to clear your configuration?',
+                  abort=True)
 
-    for key, value in CONFIG.items():
+    config = ConfigLoader.load_config()
+    for key, value in config.items():
         if key == 'tf_file':
-            CONFIG[key] = 'main.tf'
+            config[key] = 'main.tf'
         else:
-            CONFIG[key] = None
+            config[key] = None
 
-    with open(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config.json'), 'w') as f:
-        json.dump(CONFIG, f, indent=2, sort_keys=True)
+    ConfigLoader.save_config(config)
     ctx.exit()
+
 
 def get_saved_configs(ctx, param, value):
     if value is False:
         return
 
-    _path = os.path.join(os.path.dirname(__file__), '..', '..', 'util', 'config_files')
-    click.echo('\t'.join(sorted([x[:-5] for x in os.listdir(_path)])))
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..', '..', 'util',
+        'config_files')
+    click.echo('\t'.join(sorted([x[:-5] + (' ' * (20 - len(x[:-5])))
+                                 for x in os.listdir(path)])))
     ctx.exit()
-    
+   
 
 @click.command('config',
                help=HELP_TEXT,
@@ -108,12 +116,12 @@ def get_saved_configs(ctx, param, value):
               help='List saved configs.', is_flag=True,
               callback=get_saved_configs, is_eager=True)
 @click.option('-t', '--tf-file',
-              help='TF file, defaults to main.tf',default=None)
+              help='TF file, defaults to main.tf', default=None)
 @click.option('-s3', '--s3-bucket',
               help='Set s3 bucket', default=None)
 @click.option('-k', '--s3-key',
               help='Set s3 key', default=None)
-@click.option('-l', '--lambda-name',
+@click.option('-n', '--name',
               help='Set lambda function name', default=None)
 @click.option('-r', '--requirements',
               help='Requirements for your package', default=None)
@@ -132,23 +140,25 @@ def get_saved_configs(ctx, param, value):
 @click.option('-load',
               help='Loads the config from the current directory.',
               is_flag=True, default=False)
-def cli(tf_file, s3_bucket, s3_key, lambda_name, get, clear, requirements,
+def cli(tf_file, s3_bucket, s3_key, name, get, clear, requirements,
         script, package, replace, save, open_, see, load):
    
-    global CONFIG
+    config = ConfigLoader.load_config()
 
-    if lambda_name is not None:
-        for key, value in CONFIG.items():
+    # Clears config if name is changed to avoid user error
+    if name is not None:
+        for key, value in config.items():
             if key == 'tf_file':
-                CONFIG[key] = 'main.tf'
+                config[key] = 'main.tf'
             else:
-                CONFIG[key] = None
+                config[key] = None
 
+    ConfigLoader.save_config(config)
     run_file_options(
         tf_file       = tf_file, 
         s3_bucket     = s3_bucket,
         s3_key        = s3_key, 
-        lambda_name   = lambda_name,
+        name          = name,
         requirements  = requirements,
         script        = script,
         package       = package
@@ -160,54 +170,47 @@ def cli(tf_file, s3_bucket, s3_key, lambda_name, get, clear, requirements,
 
 
 def run_file_options(**kwargs):
-    '''
+    """
     Sets various config parameters.
-    '''
-    global CONFIG
-
+    """
+    config = ConfigLoader.load_config()
     for option, filepath in kwargs.items():
-        if option in ['s3_bucket', 's3_key', 'lambda_name'] and filepath is not None:
-            if option == 'lambda_name':
+        if option in ['s3_bucket', 's3_key', 'name'] and filepath is not None:
+            if option == 'name':
                 _package_dir = Path(os.path.join(os.path.dirname(__file__),
-                                                 '..', '..', 'deployment_packages',
+                                                 '..', '..',
+                                                 'deployment_packages',
                                                  filepath))
-                try:
+                if _package_dir.exists() is False:
                     os.makedirs(_package_dir)
-                except FileExistsError:
-                    shutil.rmtree(_package_dir)
-                    os.makedirs(_package_dir)
-                CONFIG['package'] = _package_dir.resolve().__str__()
-                CONFIG['lambda_name'] = filepath
+                config['package'] = _package_dir.resolve().__str__()
+                config['name'] = filepath
             else:
-                CONFIG[option] = filepath
+                config[option] = filepath
             continue
 
         if filepath is not None and filepath != 'main.tf':
             _filepath = Path(filepath)
             if _filepath.is_file() or _filepath.is_dir():
-                CONFIG[option] = _filepath.resolve().__str__()
+                config[option] = _filepath.resolve().__str__()
             else:
                 click.secho('Improper file name or file doesn\'t exist.', fg='red')  
                 sys.exit(1)
 
-    with open(os.path.join(os.path.dirname(__file__),
-                           '..', '..', '..', 'config.json'), 'w') as f:
-            json.dump(CONFIG, f, indent=2, sort_keys=True)
+    ConfigLoader.save_config(config)
 
 
 def run_general_options(get, clear, replace, save, open_, load):
     """
     Runs config options not related to setting config options
     """
-    global CONFIG
+    config = ConfigLoader.load_config()
 
     if replace != ():
-        for key, value in CONFIG.items():
+        for key, value in config.items():
             if value is not None:
-                CONFIG[key] = value.replace(replace[0], replace[1])
-        with open(os.path.join(os.path.dirname(__file__),
-                               '..', '..', '..', 'config.json'), 'w') as f:
-            json.dump(CONFIG, f, indent=2, sort_keys=True)                
+                config[key] = value.replace(replace[0], replace[1])
+        ConfigLoader.save_config(config)
 
     if open_ is not None:
         try:
@@ -215,10 +218,8 @@ def run_general_options(get, clear, replace, save, open_, load):
                                       '..', '..', 'util',
                                       'config_files', open_ + '.json'))
             with open(_path, 'r') as f:
-                CONFIG = json.load(f)
-            with open(os.path.join(os.path.dirname(__file__), '..', '..', '..',
-                                   'config.json'), 'w') as f:
-                json.dump(CONFIG, f, indent=2, sort_keys=True)
+                config = json.load(f)
+            ConfigLoader.save_config(config)
         except IOError as e:
             click.secho(e, fg='red')
             sys.exit(1)
@@ -227,11 +228,7 @@ def run_general_options(get, clear, replace, save, open_, load):
         with open(os.path.join(os.path.dirname(__file__),
                                '..', '..', 'util',
                                'config_files', save + '.json'), 'w') as f:
-            json.dump(CONFIG, f, indent=2, sort_keys=True)
+            json.dump(config, f, indent=2, sort_keys=True)
 
     if load:
-        CONFIG = ConfigLoader.add_defaults(CONFIG)
-        with open(os.path.join(os.path.dirname(__file__),
-                               '..', '..', '..',
-                               'config.json'), 'w') as f:
-            json.dump(CONFIG, f, indent=2, sort_keys=True)
+        config = ConfigLoader.add_defaults(config)
