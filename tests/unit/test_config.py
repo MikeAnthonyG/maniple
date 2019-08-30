@@ -1,4 +1,4 @@
-import os
+import time
 
 from click.testing import CliRunner
 from unittest import TestCase
@@ -67,5 +67,6 @@ class TestConfigCommand(TestCase):
     def test_open(self):
         self.runner.invoke(cli, ['--name', 'initiateConfigWipe'])
         self.runner.invoke(cli, ['-open', 'manipleTestSave'])
+        time.sleep(1)
         config = self.get_config()
         self.assertEquals(config['name'], 'manipleTestSave')

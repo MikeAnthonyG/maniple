@@ -1,7 +1,6 @@
 import click
 import json
 import os
-import shutil
 import sys
 
 from pathlib import Path
@@ -101,8 +100,8 @@ def get_saved_configs(ctx, param, value):
     click.echo('\t'.join(sorted([x[:-5] + (' ' * (20 - len(x[:-5])))
                                  for x in os.listdir(path)])))
     ctx.exit()
-   
 
+    
 @click.command('config',
                help=HELP_TEXT,
                short_help='Setup directories and functions for QoL.')
@@ -163,9 +162,8 @@ def cli(tf_file, s3_bucket, s3_key, name, get, clear, requirements,
         script        = script,
         package       = package
     )
-    
-    run_general_options(get, clear, replace, save, open_, load) 
 
+    run_general_options(get, clear, replace, save, open_, load)
     sys.exit(0)
 
 
@@ -194,7 +192,7 @@ def run_file_options(**kwargs):
             if _filepath.is_file() or _filepath.is_dir():
                 config[option] = _filepath.resolve().__str__()
             else:
-                click.secho('Improper file name or file doesn\'t exist.', fg='red')  
+                click.secho('Improper file name or file doesn\'t exist.', fg='red')
                 sys.exit(1)
 
     ConfigLoader.save_config(config)

@@ -1,10 +1,7 @@
 import click
-import hcl
 import logging
-import os
 import shutil
 import sys
-import re
 
 from pathlib import Path
 from maniplecli.util.config_loader import ConfigLoader
@@ -13,6 +10,7 @@ from maniplecli.util.lambda_packages import lambda_packages
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 class PackageDownloader():
 
@@ -43,7 +41,9 @@ class PackageDownloader():
                 except ValueError as e:
                     logger.debug('Python requirements.txt misconfigured: {}'.format(e))
                     continue
-                package_path = PackageDownloader._check_for_packages_to_replace(package_name)
+                package_path = PackageDownloader._check_for_packages_to_replace(
+                    package_name
+                )
                 if package_path is not None:
                     package_path = Path(package_path)
                     shutil.copy(
@@ -59,7 +59,7 @@ class PackageDownloader():
             for requirement in requirements_to_replace:
                 cmds.append('pip install --target={} {}'.format(
                     package,
-                    requirement
+                    requirement.strip()
                 ))
         else:
             cmds.append('pip install --target={} -r {}'.format(
@@ -107,7 +107,8 @@ class PackageDownloader():
             i = 1
             for versions in lambda_package.keys():
                 user_input_str.append(
-                    '{} ({}): {}=={}'.format(i, versions, package_name, lambda_package[versions]['version'])
+                    '{} ({}): {}=={}'.format(i, versions, package_name,
+                                             lambda_package[versions]['version'])
                 )
                 package_to_replace[i] = lambda_package[versions]['path']
                 i += 1

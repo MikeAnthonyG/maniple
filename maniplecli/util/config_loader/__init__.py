@@ -324,8 +324,8 @@ class ConfigLoader():
         except KeyError:
             click.echo('Terraform file missing required fields:\nruntime\nhandler')
             sys.exit(1)
-        except TypeError as e:
-            logger.error("{}: User tried to load config from another working directory")
+        except TypeError:
+            logger.error("User tried to load config from another working directory")
             click.echo('Load correct resource/module with \'maniple config -n resource_name\' or \'maniple config -c\'')
             sys.exit(1)
         return None

@@ -47,21 +47,24 @@ HELP_TEXT = """
 @click.option('-n', '--new-function',
               help='Deploys a new AWS resource with Terraform Apply',
               is_flag=True, default=False)
-@click.option('-t', '--tf_file',
-              help='Name of terraform file (Default=main.tf)',
+@click.option('-m', '--main_tf_file',
+              help='Name of terraform file (Default=main.tf) for use with .tf.json files',
               default='main.tf')
-def cli(all, update, new_function, tf_file):
-    run_cli(all, update, new_function, tf_file)
+@click.option('-t', '--target',
+              help='Target terraform resource, must be in form of resource.aws_lambda_function.name',
+              default=None)
+def cli(all, update, new_function, main_tf_file, target):
+    run_cli(all, update, new_function, main_tf_file, target)
 
 
-def run_cli(all, update, new_function, tf_file):
+def run_cli(all, update, new_function, main_tf_file, target):
     if all:
-        _deploy_all(new_function, tf_file)
+        _deploy_all(new_function, main_tf_file)
     else:
         if update:
             _update()
         elif new_function:
-            _new_function()
+            _new_function(target)
         else:
             _deploy()
     sys.exit(0)
@@ -81,11 +84,11 @@ def _update():
     _update_function(config['name'], config['s3_bucket'], config['s3_key'])
 
 
-def _new_function():
+def _new_function(target):
     config = ConfigLoader.add_defaults(ConfigLoader.load_config())
     _create_package(config['script'], config['requirements'], config['package'])
     _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
-    _terraform_apply()
+    _terraform_apply(target)
 
 
 def _deploy_all(apply_flag, tf_file):
@@ -117,11 +120,18 @@ def _deploy_all(apply_flag, tf_file):
                 temp_config['s3_key'])
 
     if apply_flag:
-        _terraform_apply()
+        _terraform_apply(None)
 
 
-def _terraform_apply():
-    terraform_commands = ['terraform init', 'terraform apply -auto-approve']
+def _terraform_apply(target):
+    logger.debug('Target: {}'.format(target))
+    if target is not None:
+        terraform_commands = [
+            'terraform init',
+            'terraform apply -target={} -auto-approve'.format(target)
+        ]
+    else:
+        terraform_commands = ['terraform init', 'terraform apply -auto-approve']
     for cmd in terraform_commands:
         return_code, out, err = Shell.run(cmd, os.getcwd())
         if return_code == 0:

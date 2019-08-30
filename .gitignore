@@ -16,3 +16,4 @@ maniplecli/cli/main.pyc
 maniplecli/commands/__init__.pyc
 maniplecli/commands/config/__init__.pyc
 .terraform
+maniplecli/util/config_loader/config.json

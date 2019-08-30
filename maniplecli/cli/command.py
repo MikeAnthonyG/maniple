@@ -9,10 +9,10 @@ import click
 logger = logging.getLogger(__name__)
 
 MANIPLE_COMMAND_PACKAGES = {
-    "maniplecli.commands.sam",
-    "maniplecli.commands.pack",
-    "maniplecli.commands.config",
-    "maniplecli.commands.deploy"
+    'maniplecli.commands.logs',
+    'maniplecli.commands.pack',
+    'maniplecli.commands.config',
+    'maniplecli.commands.deploy'
 }
 
 class BaseCommand(click.MultiCommand):
@@ -29,7 +29,7 @@ class BaseCommand(click.MultiCommand):
     def _set_commands(package_names):
         """
         Extract the command name from package name. Last part of the module path is the command
-        ie. if path is foo.bar.baz, then "baz" is the command name.
+        ie. if path is foo.bar.baz, then 'baz' is the command name.
         :param package_names: List of package names
         :return: Dictionary with command name as key and the package name as value.
         """
@@ -57,7 +57,7 @@ class BaseCommand(click.MultiCommand):
         :return: Click object representing the command
         """
         if cmd_name not in self._commands:
-            logger.error("Command %s not available", cmd_name)
+            logger.error('Command %s not available', cmd_name)
             return
 
         pkg_name = self._commands[cmd_name]
@@ -65,12 +65,12 @@ class BaseCommand(click.MultiCommand):
         try:
             mod = importlib.import_module(pkg_name)
         except ImportError:
-            print("import error")
-            logger.exception("Command '%s' is not configured correctly. Unable to import '%s'", cmd_name, pkg_name)
+            print('import error')
+            logger.exception('Command \'%s\' is not configured correctly. Unable to import \'%s\'', cmd_name, pkg_name)
             return
 
-        if not hasattr(mod, "cli"):
-            logger.error("Command %s is not configured correctly. It must expose an function called 'cli'", cmd_name)
+        if not hasattr(mod, 'cli'):
+            logger.error('Command %s is not configured correctly. It must expose an function called \'cli\'', cmd_name)
             return
 
         return mod.cli  

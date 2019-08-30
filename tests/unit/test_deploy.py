@@ -36,3 +36,9 @@ class TestDeployCommand(TestCase):
         self.runner.invoke(con, ['-c'], input='y')
         result_new_function = self.runner.invoke(deploy, ['--all', '-n'])
         self.assertEquals(result_new_function.exit_code, 0)
+
+    def test_target_mult_resources(self):
+        os.chdir(self.file_dir.joinpath('tf_test', 'mult_resources'))
+        self.runner.invoke(con, ['-c'], input='y')        
+        result = self.runner.invoke(deploy, ['-n', '--target module.mod_basic'])
+        self.assertEquals(result.exit_code, 0)
