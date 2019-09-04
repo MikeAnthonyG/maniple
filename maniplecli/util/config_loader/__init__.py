@@ -9,12 +9,9 @@ import re
 from pathlib import Path
 from typing import Dict
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('ConfigLoader')
-
 logger.setLevel(logging.DEBUG)
+
 
 class ConfigLoader():
 

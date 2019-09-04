@@ -22,7 +22,7 @@ class TestConfigLoader(TestCase):
         self.assertEquals(config['s3_key'], key)
         self.assertEquals(config['script'], script)
         self.assertTrue(Path(config['package']).exists())
-            
+
     def test_basic(self):
         os.chdir(self.file_dir.joinpath('tf_test', 'basic'))
         self.runner.invoke(cli, ['--name', 'basic'])
