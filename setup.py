@@ -1,8 +1,6 @@
-    
 #!/usr/bin/env python
 
 import io
-import re
 import os
 from setuptools import setup, find_packages
 
@@ -33,15 +31,15 @@ setup(
     author='Mike',
     install_package_data=True,
     packages=find_packages(),
-    keywords="maniple",
+    keywords='maniple',
     # Support Python 2.7 and 3.6 or greater
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*',
     entry_points={
-        'console_scripts':[
+        'console_scripts': [
             'maniple=maniplecli.cli.main:cli'
         ]
     },
     install_requires=read_requirements('base.txt'),
     include_package_data=True,
-    test_suite="tests",
+    test_suite='tests',
 )
