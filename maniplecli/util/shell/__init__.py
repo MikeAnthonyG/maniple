@@ -1,13 +1,11 @@
-import json
 import logging
-import typing
 import subprocess
-import sys
 
 from subprocess import PIPE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 class Shell():
 

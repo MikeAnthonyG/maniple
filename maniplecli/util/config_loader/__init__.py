@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Dict
 
-logger = logging.getLogger('ConfigLoader')
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 

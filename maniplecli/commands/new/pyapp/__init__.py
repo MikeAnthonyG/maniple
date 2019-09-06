@@ -1,18 +1,24 @@
+import click
 import os
 
 from pathlib import Path
+
 
 class pyapp:
     def __init__(self, name):
         self.name = name
 
     def run(self):
-        self.write_py_main()
-        Path('requirements.txt').touch()
-        self.write_py_file()
-        self.write_test_folder()
+        try:
+            self.write_py_main()
+            Path('requirements.txt').touch()
+            self.write_py_file()
+            self.write_test_folder()
+        except FileExistsError:
+            click.echo('Already attempted to create a lambda function here.')
+            click.echo('Delete files and try again.')
+            return 1
         return 0
-        
 
     def write_py_main(self):
         f = open('main.tf', 'w')
@@ -22,7 +28,6 @@ class pyapp:
         f.write(self.main_tf_resource('python3.6'))
         f.close()
 
-        
     def write_py_file(self):
         src = Path(Path.cwd(), 'src')
         src.mkdir()
@@ -32,7 +37,6 @@ class pyapp:
         f.close()
         os.chdir('..')
 
-
     def write_test_folder(self):
         tests = Path(Path.cwd(), 'tests')
         tests.mkdir()
@@ -41,10 +45,9 @@ class pyapp:
         unit_dir.mkdir()
         os.chdir(unit_dir)
         f = open('test_handler.py', 'w')
-        f.write(self.write_py_unit_test())
+        f.write(self.py_unit_test_str())
         f.close()
         os.chdir('../..')
-
 
     def main_tf_provider(self):
         return '''
@@ -53,14 +56,12 @@ provider "aws" {
 }\n
 '''
 
-
     def main_tf_role(self):
         return '''
 data "aws_iam_role" "{0}_role" {{
   name = "{0}_role"
 }}
 '''.format(self.name)
-
 
     def main_tf_version(self):
         return '''
@@ -77,7 +78,7 @@ resource "aws_lambda_function" "{n}" {{
   function_name = "{n}"
   s3_bucket = "<<s3-bucket-name>>"
   s3_key = "<<s3-key-name>>"
-  role = "${{data.aws_iam_role.{n}.arn}}"
+  role = "${{data.aws_iam_role.{n}_role.arn}}"
   handler = "{n}.handler"
   runtime = "{r}"
   timeout = 1
@@ -92,8 +93,7 @@ def handler(event, context):
     return 0
 '''
 
-
-    def write_py_unit_test(self):
+    def py_unit_test_str(self):
         return '''
 import importlib.util
 from unittest import TestCase
@@ -103,7 +103,7 @@ from pathlib import Path
 class TestHandler(TestCase):
     """Loads module without __init__"""
     def setUp(self):
-        file_to_test = {name}.py
+        file_to_test = '{name}.py'
         path = Path(__file__, '..', '..', '..', 'src', file_to_test)
         print(path)
         self.assertTrue(path.exists())
@@ -115,8 +115,8 @@ class TestHandler(TestCase):
         self.module.__spec__.loader.exec_module(self.module)
 
     def test_handler_returns_zero(self):
-        event = {{'event': '1'}}
+        event = {{'target': '1'}}
         context = 0
         result = self.module.handler(event, context)
-        self.assertEquals(result, 0)
+        self.assertEqual(result, 0)
 '''.format(name=self.name)

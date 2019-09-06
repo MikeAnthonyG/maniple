@@ -21,6 +21,7 @@ Create new javascript function:
 $ maniple new jsapp my_js_fn 
 '''
 
+
 @click.command(
     'new',
     help=HELP_TEXT,
@@ -44,5 +45,8 @@ def cli(template, name):
     spec.loader.exec_module(spec_app)
     class_ = getattr(spec_app, template)
     app = class_(name)
-    app.run()
+    return_code = app.run()
+    if return_code == 1:
+        click.secho('Error creating app.', fg='red')
+        sys.exit(0)
     sys.exit(0)
