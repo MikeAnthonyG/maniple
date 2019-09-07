@@ -9,7 +9,7 @@ from maniplecli.util.shell import Shell
 from maniplecli.util.lambda_packages import lambda_packages
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class PackageDownloader():

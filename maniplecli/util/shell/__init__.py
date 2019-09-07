@@ -13,7 +13,7 @@ class Shell():
     def run(cmd, pwd):
         stderr = PIPE
         stdout = PIPE
-        
+
         p = subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
                              cwd=pwd)
 

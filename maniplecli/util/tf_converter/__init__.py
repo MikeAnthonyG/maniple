@@ -7,7 +7,7 @@ import sys
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 class TerraformConverter():
@@ -37,6 +37,15 @@ class TerraformConverter():
         }
 
     def to_cloudformation(self, config):
+        """
+        Converts terraform to a basic cloudformation file.
+
+        Args:
+            config: config dictionary
+        
+        Returns:
+            cf_template: dictionary with cloudformation style
+        """
         cf_template = TerraformConverter.cloud_formation_bare_template()
         tf_resource = self.get_resource_attrs(
             TerraformConverter.load_terraform(config['tf_file']),
@@ -53,6 +62,17 @@ class TerraformConverter():
         return cf_template
 
     def get_resource_attrs(self, tf, name):
+        """
+        Gets all values necesary to create the cloudformation dict.
+
+        Args:
+            tf: dictionary loaded from the main terraform file
+            name: name of Lambda fn
+
+        Returns:
+            cf_template: dictionary with the cloudformation style
+        """
+
         # Find if resource
         try:
             resources = tf['resource']['aws_lambda_function']
@@ -98,5 +118,6 @@ class TerraformConverter():
         return None
 
     def to_camel_case(self, str_):
+        """Converts snake case to camel case."""
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', str_)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
