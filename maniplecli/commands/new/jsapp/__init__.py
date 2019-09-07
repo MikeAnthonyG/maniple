@@ -13,6 +13,9 @@ class jsapp:
         self.name = name
 
     def run(self):
+        """
+        Runs all methods to create the necesary files.
+        """
         try:
             self.write_js_main()
             self.write_package_json()
@@ -30,6 +33,9 @@ class jsapp:
         return 0
 
     def write_js_main(self):
+        """
+        Writes the main.tf file.
+        """
         f = open('main.tf', 'w')
         f.write(self.main_tf_provider())
         f.write(self.main_tf_role())
@@ -38,6 +44,9 @@ class jsapp:
         f.close()
 
     def write_package_json(self):
+        """
+        Writes package.json file.
+        """
         with open('package.json', 'w') as f:
             json.dump(
                 self.package_json_dict(),
@@ -46,6 +55,9 @@ class jsapp:
             )
 
     def write_js_file(self):
+        """
+        Writes the js script.
+        """
         src = Path(Path.cwd(), 'src')
         src.mkdir()
         os.chdir(src)
@@ -55,6 +67,9 @@ class jsapp:
         os.chdir('..')
 
     def write_test_folder(self):
+        """
+        Creates directories as well as a test script.
+        """
         tests = Path(Path.cwd(), 'tests')
         tests.mkdir()
         os.chdir(tests)

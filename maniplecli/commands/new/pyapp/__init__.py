@@ -9,6 +9,9 @@ class pyapp:
         self.name = name
 
     def run(self):
+        """
+        Runs all necesary methods to create the app.
+        """
         try:
             self.write_py_main()
             Path('requirements.txt').touch()
@@ -21,6 +24,9 @@ class pyapp:
         return 0
 
     def write_py_main(self):
+        """
+        Writes main.tf file.
+        """
         f = open('main.tf', 'w')
         f.write(self.main_tf_provider())
         f.write(self.main_tf_role())
@@ -29,6 +35,9 @@ class pyapp:
         f.close()
 
     def write_py_file(self):
+        """
+        Writes python script file.
+        """
         src = Path(Path.cwd(), 'src')
         src.mkdir()
         os.chdir(src)
@@ -38,6 +47,9 @@ class pyapp:
         os.chdir('..')
 
     def write_test_folder(self):
+        """
+        Creates directories and a single test script.
+        """
         tests = Path(Path.cwd(), 'tests')
         tests.mkdir()
         os.chdir(tests)

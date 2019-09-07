@@ -7,7 +7,7 @@ from maniplecli.util.config_loader import ConfigLoader
 from maniple.util.shell import Shell
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 HELP_TEXT = """
 Under construction

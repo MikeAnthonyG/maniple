@@ -1,13 +1,12 @@
 import click
 import importlib.util
 import logging
-import os
 import sys
 
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 HELP_TEXT = '''
 Creates a template with the main file components to run Lambda functions
