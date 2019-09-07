@@ -56,13 +56,11 @@ class TestConfigCommand(TestCase):
             config = self.get_config()
             self.assertEquals(config['name'], 'rightName')
             self.assertTrue('rightScript' in config['script'])
-    
 
     def test_save(self):
         self.runner.invoke(cli, ['--name', 'manipleTestSave'])
         result = self.runner.invoke(cli, ['-save', 'manipleTestSave'])
         self.assertEquals(result.exit_code, 0)
-        
 
     def test_open(self):
         self.runner.invoke(cli, ['--name', 'initiateConfigWipe'])

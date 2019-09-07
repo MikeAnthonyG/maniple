@@ -48,4 +48,5 @@ def cli(template, name):
     if return_code == 1:
         click.secho('Error creating app.', fg='red')
         sys.exit(0)
+    click.secho('New {} created successfully.'.format(template), fg='green')
     sys.exit(0)
