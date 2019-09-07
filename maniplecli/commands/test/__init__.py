@@ -10,7 +10,7 @@ from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 HELP_TEXT = '''
 Run tests in the lambda function directory.
@@ -89,7 +89,7 @@ def run_test(cmd, runtime):
         if runtime == 'nodejs':
             click.echo(out)
         else:
-            click.echo(out)  # Prints print vars
+            click.echo(out)  # Prints vars from print() statements
             click.echo(err)  # Prints results of unit test
         logger.debug(out)
     else:
