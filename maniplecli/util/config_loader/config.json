@@ -1,9 +1,9 @@
 {
-  "name": "basic",
-  "package": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\maniplecli\\deployment_packages\\basic",
-  "requirements": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\tests\\unit\\tf_test\\basic\\requirements.txt",
-  "s3_bucket": "aws-lambda-project-code",
-  "s3_key": "maniple/test/1.0.0/basic.zip",
-  "script": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\tests\\unit\\tf_test\\basic\\basic.py",
+  "name": null,
+  "package": null,
+  "requirements": null,
+  "s3_bucket": null,
+  "s3_key": null,
+  "script": null,
   "tf_file": "main.tf"
 }
