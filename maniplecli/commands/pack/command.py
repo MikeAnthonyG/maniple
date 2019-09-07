@@ -14,7 +14,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 HELP_TEXT = """
 Use this command to zip site-packages, update deployment packages with new code, create deployment packages, send to s3\n
