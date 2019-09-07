@@ -1,9 +1,9 @@
 {
-  "name": "lmao",
-  "package": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\maniplecli\\deployment_packages\\lmao",
-  "requirements": "C:\\Users\\Mikey\\Desktop\\test_json\\fin_py2\\requirements.txt",
-  "s3_bucket": "<<s3-bucket-name>>",
-  "s3_key": "<<s3-key-name>>",
-  "script": "C:\\Users\\Mikey\\Desktop\\test_json\\fin_py2\\src",
+  "name": "basic",
+  "package": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\maniplecli\\deployment_packages\\basic",
+  "requirements": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\tests\\unit\\tf_test\\basic\\requirements.txt",
+  "s3_bucket": "aws-lambda-project-code",
+  "s3_key": "maniple/test/1.0.0/basic.zip",
+  "script": "C:\\Users\\Mikey\\Desktop\\Repos\\maniple\\tests\\unit\\tf_test\\basic\\basic.py",
   "tf_file": "main.tf"
 }

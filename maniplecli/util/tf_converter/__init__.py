@@ -1,9 +1,10 @@
 import click
 import hcl
 import logging
+import os
 import re
+import sys
 
-from maniplecli.util.config_loader import ConfigLoader
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -35,7 +36,6 @@ class TerraformConverter():
             }
         }
 
-
     def to_cloudformation(self, config):
         cf_template = TerraformConverter.cloud_formation_bare_template()
         tf_resource = self.get_resource_attrs(
@@ -51,20 +51,22 @@ class TerraformConverter():
         # Add package zip file location as the code to invoke locally
         cf_template['Properties']['Code'] = config['package'] + '.zip'
         return cf_template
-        
 
     def get_resource_attrs(self, tf, name):
-        #Find if resource
+        # Find if resource
         try:
             resources = tf['resource']['aws_lambda_function']
             for lambda_name, values in resources.items():
                 if lambda_name == name:
-                    return values            
+                    return values
         except KeyError as e:
             logger.debug(e)
             pass
+        except TypeError as e:
+            logger.debug(e)
+            pass
 
-        #Find if module
+        # Find if module
         try:
             modules = tf['module']
         except KeyError as e:
@@ -94,8 +96,7 @@ class TerraformConverter():
 
         logger.debug('Unable to get resource attrs')
         return None
-       
-    
+
     def to_camel_case(self, str_):
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', str_)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
