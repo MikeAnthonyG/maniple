@@ -21,7 +21,8 @@ class TestTerraformConverter(TestCase):
         os.chdir(self.file_dir.joinpath('tf_test', 'basic'))
         self.runner.invoke(cli, ['--name', 'basic'])
         config = ConfigLoader.add_defaults()
-        res = self.converter.get_resource_attrs(config['tf_file'], config['name'])
+        tf = TerraformConverter.load_terraform(config['tf_file'])
+        res = self.converter.get_resource_attrs(tf, config['name'])
         self.assertEquals(res['function_name'], 'basic')
         self.assertEquals(res['handler'], 'basic.handler')
         self.assertEquals(res['runtime'], 'python3.6')
@@ -32,7 +33,8 @@ class TestTerraformConverter(TestCase):
         os.chdir(self.file_dir.joinpath('tf_test', 'module_basic'))
         self.runner.invoke(cli, ['--name', 'mod_basic'])
         config = ConfigLoader.add_defaults()
-        res = self.converter.get_resource_attrs(config['tf_file'], config['name'])
+        tf = TerraformConverter.load_terraform(config['tf_file'])
+        res = self.converter.get_resource_attrs(tf, config['name'])
         self.assertEquals(res['function_name'], 'mod_basic')
         self.assertEquals(res['handler'], 'mod_basic.handler')
         self.assertEquals(res['runtime'], 'python3.6')
@@ -47,7 +49,7 @@ class TestTerraformConverter(TestCase):
         self.assertEquals(res['Properties']['Handler'], 'mod_basic.handler')
         self.assertEquals(res['Properties']['Runtime'], 'python3.6')
         self.assertEquals(res['Properties']['Timeout'], '900')
-        self.assertEquals(res['Properties']['MemorySize'], '900')
+        self.assertEquals(res['Properties']['MemorySize'], 128)
         self.assertEquals(res['Properties']['Code'],
                           config['package'] + '.zip')
 

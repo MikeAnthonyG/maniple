@@ -22,7 +22,7 @@ resource "aws_lambda_function" "basic" {
     memory_size = 128
     environment {
       variables = {
-        foo = "bar"
-      } 
+        "foo" = "bar"
+      }
     }
 }

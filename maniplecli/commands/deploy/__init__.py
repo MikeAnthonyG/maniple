@@ -3,13 +3,15 @@ import click
 import os
 import sys
 
-from maniplecli.commands.pack.command import (_create_package, _update_script,
-                                              _upload_package, _update_function)
+from maniplecli.commands.pack.command import (create_package_fn,
+                                              update_script_fn,
+                                              upload_package_fn,
+                                              update_function_fn)
 from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 HELP_TEXT = """
@@ -72,22 +74,22 @@ def run_cli(all, update, new_function, main_tf_file, target):
 
 def _deploy():
     config = ConfigLoader.add_defaults(ConfigLoader.load_config())
-    _create_package(config['script'], config['requirements'], config['package'])
-    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
-    _update_function(config['name'], config['s3_bucket'], config['s3_key'])
+    create_package_fn(config['script'], config['requirements'], config['package'])
+    upload_package_fn(config['s3_bucket'], config['s3_key'], config['package'])
+    update_function_fn(config['name'], config['s3_bucket'], config['s3_key'])
 
 
 def _update():
     config = ConfigLoader.add_defaults(ConfigLoader.load_config())
-    _update_script(config['package'], config['script'])
-    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
-    _update_function(config['name'], config['s3_bucket'], config['s3_key'])
+    update_script_fn(config['package'], config['script'])
+    upload_package_fn(config['s3_bucket'], config['s3_key'], config['package'])
+    update_function_fn(config['name'], config['s3_bucket'], config['s3_key'])
 
 
 def _new_function(target):
     config = ConfigLoader.add_defaults(ConfigLoader.load_config())
-    _create_package(config['script'], config['requirements'], config['package'])
-    _upload_package(config['s3_bucket'], config['s3_key'], config['package'])
+    create_package_fn(config['script'], config['requirements'], config['package'])
+    upload_package_fn(config['s3_bucket'], config['s3_key'], config['package'])
     _terraform_apply(target)
 
 
@@ -104,17 +106,17 @@ def _deploy_all(apply_flag, tf_file):
         temp_config = ConfigLoader.reset_config()
         temp_config['name'] = resource[1]
         temp_config = ConfigLoader.add_defaults(temp_config)
-        _create_package(
+        create_package_fn(
             temp_config['script'],
             temp_config['requirements'],
             temp_config['package'])
-        _upload_package(
+        upload_package_fn(
             temp_config['s3_bucket'],
             temp_config['s3_key'],
             temp_config['package'])
         logger.debug('Created and uploaded {} resource'.format(temp_config['name']))
         if apply_flag is False:
-            _update_function(
+            update_function_fn(
                 temp_config['name'],
                 temp_config['s3_bucket'],
                 temp_config['s3_key'])

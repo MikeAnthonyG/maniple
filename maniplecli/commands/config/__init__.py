@@ -101,7 +101,7 @@ def get_saved_configs(ctx, param, value):
                                  for x in os.listdir(path)])))
     ctx.exit()
 
-    
+
 @click.command('config',
                help=HELP_TEXT,
                short_help='Setup directories and functions for QoL.')
@@ -141,7 +141,7 @@ def get_saved_configs(ctx, param, value):
               is_flag=True, default=False)
 def cli(tf_file, s3_bucket, s3_key, name, get, clear, requirements,
         script, package, replace, save, open_, see, load):
-   
+
     config = ConfigLoader.load_config()
 
     # Clears config if name is changed to avoid user error

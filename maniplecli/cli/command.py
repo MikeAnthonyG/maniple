@@ -13,7 +13,8 @@ MANIPLE_COMMAND_PACKAGES = {
     'maniplecli.commands.pack',
     'maniplecli.commands.config',
     'maniplecli.commands.deploy',
-    'maniplecli.commands.local'
+    'maniplecli.commands.new',
+    'maniplecli.commands.test'
 }
 
 class BaseCommand(click.MultiCommand):

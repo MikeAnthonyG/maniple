@@ -9,8 +9,8 @@ import re
 from pathlib import Path
 from typing import Dict
 
-logger = logging.getLogger('ConfigLoader')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class ConfigLoader():
@@ -27,7 +27,7 @@ class ConfigLoader():
                 json.dump(config, f, indent=2, sort_keys=True)
             logger.debug('Reset config file to default.')
             sys.exit(0)
-       
+
     @staticmethod
     def save_config(config):
         with open(os.path.join(Path(__file__).parent, 'config.json'), 'w') as f:
@@ -52,15 +52,22 @@ class ConfigLoader():
             's3_key': None,
             'script': None,
             'tf_file': 'main.tf'
-        }  
+        }
 
     @staticmethod
     def add_defaults(config=None):
+        """
+        Loads config file with data from the main.tf file.
+        Default config param so won't overwrite user supplied config values.
+
+        Args:
+            config: config dictionary with values
+        """
         if config is None:
             config = ConfigLoader.load_config()
-            
+
         tf = ConfigLoader.load_terraform(config['tf_file'])
-            
+
         if config['name'] is None:
             possible_names = ConfigLoader.get_possible_resources(tf)
             str_ = 'Select resource to deploy:\n'
@@ -90,7 +97,7 @@ class ConfigLoader():
                         click.echo('Input integer of the resource (1-{})'.format(
                             len(possible_names)
                         ))
-            
+
         tf_vars = ConfigLoader.load_lambda_resource(config['name'], tf)
         logger.debug('Variables to load to config: {}'.format(tf_vars))
         try:
@@ -120,7 +127,6 @@ class ConfigLoader():
                 config = ConfigLoader.handle_load_dirs(config, handler, x)
             else:
                 config = ConfigLoader.handle_load_files(config, runtime, handler, tf_vars, tf, x)
-                   
         for key, value in config.items():
             if value is None:
                 click.secho('Warning: config variable {} not set!'.format(key))
@@ -130,9 +136,18 @@ class ConfigLoader():
         logger.debug('Default config loaded as:\n{}'.format(config))
         return config
 
-
     @staticmethod
     def get_possible_resources(tf: Dict) -> Dict[str, str]:
+        """
+        Gets all possible lambda resources from a main.tf file.
+        These could be resources or modules.
+
+        Args:
+            tf: main.tf file loaded as a dictionary
+
+        Returns:
+            A dictionary with all lambda resources/modules
+        """
         fns = []
         count = 1
         try:
@@ -147,7 +162,7 @@ class ConfigLoader():
                     try:
                         if tf_module['resource']['aws_lambda_function'] is not None:
                             fns.append((count, module_name, 'module'))
-                            count += 1 
+                            count += 1
                     except KeyError:
                         continue  # No lambda resource
                 except FileNotFoundError:
@@ -159,13 +174,23 @@ class ConfigLoader():
         try:
             for name, values in tf['resource']['aws_lambda_function'].items():
                 fns.append((count, name, 'resource'))
-                count += 1 
+                count += 1
         except KeyError:
             pass
         return fns
 
     @staticmethod
     def load_lambda_resource(name, tf):
+        """
+        Loads a specific TF aws_lambda_function
+
+        Args:
+            name: name of lambda function
+            tf: main.tf values as a dictionary
+
+        Returns:
+            A dictionary of all values related to the specific function.
+        """
         try:
             lambda_resource = tf['resource']['aws_lambda_function'][name]
             return lambda_resource
@@ -201,6 +226,16 @@ class ConfigLoader():
 
     @staticmethod
     def _load_module_source(name, source):
+        """
+        Loads a specific TF module from the source aws_lambda_function
+
+        Args:
+            name: name of lambda function
+            source: source main.tf values as a dictionary
+
+        Returns:
+            A dictionary of all values related to the specific module.
+        """
         try:
             with open(os.path.join(os.getcwd(), source, 'main.tf')) as f:
                 tf_module = hcl.load(f)
@@ -216,7 +251,17 @@ class ConfigLoader():
 
     @staticmethod
     def handle_load_dirs(config, handler, dir_):
-        # Check if handler script exists in directory
+        """
+        Searches directories for the script with the handler specified.
+
+        Args:
+            config: config dict
+            handler: the handler value from the TF file
+            dir_: directory to search
+
+        Returns:
+            An updated config dict
+        """
         for f in dir_.iterdir():
             if f.is_file():
                 possible_script = f.name
@@ -226,6 +271,20 @@ class ConfigLoader():
 
     @staticmethod
     def handle_load_files(config, runtime, handler, tf_vars, tf, file_):
+        """
+        Finds files not in a directory. TODO: update
+
+        Args:
+            config: config dict
+            runtime: runtime value from TF file
+            handler: the handler value from the TF file
+            tf_vars: variables from the TF file
+            tf: loaded TF file
+            file__: file to handle
+
+        Returns:
+            An updated config dict
+        """
         filename = file_.name.split('.')
         if config['script'] is None:
             if filename[-1] == 'js' and 'nodejs' in runtime and handler == filename[0]:
@@ -255,6 +314,9 @@ class ConfigLoader():
 
     @staticmethod
     def determine_version(key, tf):
+        """
+        Determines version in the terraform main file.
+        """
         parsed_key = []
         for x in key.strip('/').split('/'):
             try:
@@ -271,11 +333,14 @@ class ConfigLoader():
 
     @staticmethod
     def get_runtime(config=None):
+        """
+        Returns the runtime specified in the TF file.
+        """
         if config is None:
             config = ConfigLoader.load_config()
-            
+
         tf = ConfigLoader.load_terraform(config['tf_file'])
-            
+
         if config['name'] is None:
             possible_names = ConfigLoader.get_possible_resources(tf)
             str_ = 'Select resource to deploy:\n'
