@@ -114,14 +114,14 @@ Notify AWS of changes to a function's code.
 	$ maniple pack -uf
 	
 ### test
-Runs test scripts located in the `tests` folder.
+Runs test scripts located in the `tests` folder. This is useful for using the Python unittest package without creating a `__init__.py` file.
 
 	$ maniple test
 	
 ### config
 Manipulate settings that override the default values loaded by maniple. Use the --help flag to see all settings that can be changed.
 
-It is sometimes required to tell maniple which lambda function you are working with (e.g. a terraform file that includes multiple aws_lambda_function resources), setting the name of the function will isolate changes to only that resource
+It is sometimes required to tell maniple which lambda function you are working with (e.g. a terraform file that includes multiple aws_lambda_function resources), setting the name of the function will isolate changes to only that resource.
 
 	$ maniple config -n your-lambda-app-name
 
