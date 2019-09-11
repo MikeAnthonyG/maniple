@@ -1,6 +1,4 @@
 venv
-maniplecli/deployment_packages/test
-maniplecli/deployment_packages/test.zip
 maniplecli/deployment_packages/
 maniplecli/util/config_files/
 maniple.egg-info
