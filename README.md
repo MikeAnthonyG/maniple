@@ -137,7 +137,13 @@ Clear your current settings
 
 	$ maniple config -c
 	
+## Installation
 
+Currently, the project hasn't been uploaded to pypi. Install maniple by downloading the source code, navigating to its directory, and running:
+
+	$ pip install --editable .
+
+Necessary packages to run maniple are `pip` and `npm`. 
 
 ## Other functionality
 More command options can be viewed with:
