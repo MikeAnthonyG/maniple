@@ -19,9 +19,13 @@ class PackageDownloader():
         runtime = ConfigLoader.get_runtime()
         if requirements is not None:
             if 'python' in runtime:
-                PackageDownloader._handle_python_packages(script, requirements, package)
+                PackageDownloader._handle_python_packages(
+                    script, requirements, package
+                )
             elif 'nodejs' in runtime:
-                PackageDownloader._handle_js_packages(script, requirements, package)
+                PackageDownloader._handle_js_packages(
+                    script, requirements, package
+                )
             else:
                 logger.debug('Unsupported runtime.')
                 click.echo('Runtime not supported.')
@@ -57,15 +61,20 @@ class PackageDownloader():
         cmds = []
         if package_path is not None:
             for requirement in requirements_to_replace:
-                cmds.append('pip install --target={} {}'.format(
-                    package,
+                cmds.append([
+                    'pip',
+                    'install',
+                    '--target={}'.format(package),
                     requirement.strip()
-                ))
+                ])
         else:
-            cmds.append('pip install --target={} -r {}'.format(
-                package,
+            cmds.append([
+                'pip',
+                'install',
+                '--target={}'.format(package),
+                '-r',
                 requirements
-            ))
+            ])
         for cmd in cmds:
             return_code, out, err = Shell.run(
                 cmd,
@@ -86,13 +95,13 @@ class PackageDownloader():
             sys.exit(1)
         for key, value in dependencies['dependencies'].items():                
             return_code, out, err = Shell.run(
-                'npm --prefix {} install key'.format(package),
+                ['npm', '--prefix', package, 'install', 'key'],
                 Path.getcwd()
             )
             if return_code != 0:
                 click.secho('{} failed.'.format('npm package install'), fg='red')
                 logger.error(err)
-                sys.exit(1)        
+                sys.exit(1)
 
     @staticmethod
     def _check_for_packages_to_replace(package_name):

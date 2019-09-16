@@ -129,11 +129,15 @@ def _terraform_apply(target):
     logger.debug('Target: {}'.format(target))
     if target is not None:
         terraform_commands = [
-            'terraform init',
-            'terraform apply -target={} -auto-approve'.format(target)
+            ['terraform', 'init'],
+            ['terraform', 'apply', '-target={}'.format(target),
+             '-auto-approve']
         ]
     else:
-        terraform_commands = ['terraform init', 'terraform apply -auto-approve']
+        terraform_commands = [
+            ['terraform', 'init'],
+            ['terraform', 'apply' '-auto-approve']
+        ]
     for cmd in terraform_commands:
         return_code, out, err = Shell.run(cmd, os.getcwd())
         if return_code == 0:

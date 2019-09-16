@@ -44,7 +44,7 @@ def run_cli(watch, error_logs, lambda_name):
 
 
 def _watch(lambda_name):
-    cmd = 'sam logs -n {} --tail'.format(lambda_name)
+    cmd = ['sam', 'logs', '-n', lambda_name, '--tail']
     return_code, out, err = Shell.run(cmd, os.getcwd())
     if return_code == 0:
         logger.debug(out)
@@ -55,7 +55,11 @@ def _watch(lambda_name):
 
 
 def _error(lambda_name):
-    cmd = 'sam logs -n {} --tail --filter /"error/"'.format(lambda_name)
+    cmd = [
+        'sam', 'logs', '-n',
+        lambda_name, '--tail',
+        '--filter', '\"error\"'
+    ]
     return_code, out, err = Shell.run(cmd, os.getcwd())
     if return_code == 0:
         logger.debug(out)
