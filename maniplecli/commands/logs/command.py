@@ -4,7 +4,7 @@ import os
 import sys
 
 from maniplecli.util.config_loader import ConfigLoader
-from maniple.util.shell import Shell
+from maniplecli.util.shell import Shell
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

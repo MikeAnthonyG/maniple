@@ -76,22 +76,27 @@ def cli(create_package, invoke, update_script, update_function, libraries,
 
 def run_cli(create_package, invoke, update_script, update_function, libraries,
             upload_package):
-    config = ConfigLoader.add_defaults()
+    config = ConfigLoader.add_defaults(ConfigLoader.load_config())
 
     if update_script:
         update_script_fn(config['package'], config['script'])
     if create_package:
-        create_package_fn(config['script'], config['requirements'], config['package'])
+        create_package_fn(config['script'],
+                          config['requirements'],
+                          config['package'])
     if upload_package:
         click.echo('Uploading file to s3 bucket...')
-        upload_package_fn(config['s3_bucket'], config['s3_key'], config['package'])
+        upload_package_fn(config['s3_bucket'],
+                          config['s3_key'],
+                          config['package'])
     if update_function:
         click.echo('Updating function on AWS...')
-        click.echo(update_function_fn(config['lambda_name'], config['s3_bucket'],
+        click.echo(update_function_fn(config['name'],
+                                      config['s3_bucket'],
                                       config['s3_key']))
     if invoke:
         click.echo('Invoking lambda...')
-        _invoke(config['lambda_name'])
+        _invoke(config['name'])
 
     sys.exit(0)
 
