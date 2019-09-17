@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Dict
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logger.setLevel(logging.DEBUG)
 
 
 class ConfigLoader():
@@ -99,7 +100,7 @@ class ConfigLoader():
                         ))
 
         tf_vars = ConfigLoader.load_lambda_resource(config['name'], tf)
-        logger.debug('Variables to load to config: {}'.format(tf_vars))
+        logger.debug('add_defaults: Variables to load to config: {}'.format(tf_vars))
         try:
             runtime = tf_vars['runtime']
             handler = tf_vars['handler'].split('.')[0]
@@ -108,7 +109,7 @@ class ConfigLoader():
             logger.error('{}: Terraform file missing either runtime or handler'.format(e))
             sys.exit(1)
         except TypeError as e:
-            logger.error('User tried to -load from different config. \n{}'.format(e))
+            logger.error('add_defaults: User tried to -load from different config. \n{}'.format(e))
             click.echo('Config file doesn\'t match directory.')
             user_input = click.confirm('Reset config and load?', abort=True)
             return ConfigLoader.add_defaults(ConfigLoader.reset_config())
@@ -133,7 +134,7 @@ class ConfigLoader():
                 logger.debug('add_defaults failed to add {}: {}'.format(key, value))
                 sys.exit(1)
         ConfigLoader.save_config(config)
-        logger.debug('Default config loaded as:\n{}'.format(config))
+        logger.debug('add_defaults: Default config loaded as:\n{}'.format(config))
         return config
 
     @staticmethod
@@ -184,6 +185,9 @@ class ConfigLoader():
         """
         Loads a specific TF aws_lambda_function
 
+        TODO: remove in and add regex
+        Handle TF vars
+
         Args:
             name: name of lambda function
             tf: main.tf values as a dictionary
@@ -195,34 +199,47 @@ class ConfigLoader():
             lambda_resource = tf['resource']['aws_lambda_function'][name]
             return lambda_resource
         except KeyError:  # Module
+            module_resource = None
+            found_source = False
+            module_key = ""
+            tf_vars = {}
             try:
-                source_vars = tf['module'][name]
-                resource_vars = ConfigLoader._load_module_source(
-                    name,
-                    tf['module'][name]['source'])
-                module_resource = None
-                tf_vars = {}
-                for lambda_key in resource_vars.keys():
-                    for key in source_vars.keys():
-                        if key in resource_vars[lambda_key]['function_name']:
-                            module_resource = resource_vars[lambda_key]
-                            break
+                for mod in tf['module']:
+                    for key, val in tf['module'][mod].items():
+                        if name == val:
+                            found_source = True
+                            module_key = key
+                    if found_source:
+                        module_resource = ConfigLoader._find_resource_from_var(
+                            name,
+                            tf['module'][mod]['source'],
+                            module_key
+                        )
+                        source_vars = tf['module'][mod]
+                        break
+            except KeyError:
+                logger.debug('load_lambda_resource: no module in main')                   
 
-                if module_resource is None:
-                    click.secho('Unable to determine lambda resource in module',
-                                fg='red')
-                    sys.exit(1)
+            if module_resource is None:
+                click.secho('Unable to determine lambda resource in module',
+                            fg='red')
+                sys.exit(1)
 
-                for tf_var_key in module_resource.keys():
-                    for source_key, source_value in source_vars.items():
+            print(module_resource)
+            print(source_vars)
+            for tf_var_key in module_resource.keys():
+                for source_key, source_value in source_vars.items():
+                    try:
                         if source_key in module_resource[tf_var_key]:
                             tf_vars[tf_var_key] = source_value
+                    except TypeError:
+                        logger.debug('Found non-str value {}'.format(
+                            module_resource[tf_var_key]
+                        ))
 
-                # Return dictionary with the keys updated from tf_vars
-                return dict(module_resource, **tf_vars)
-            except KeyError:
-                logger.debug('Can\'t find module source')
-                click.echo('Can\'t find module source.')
+            # Return dictionary with the keys updated from tf_vars
+            print(dict(module_resource, **tf_vars))
+            return dict(module_resource, **tf_vars)
 
     @staticmethod
     def _load_module_source(name, source):
@@ -249,6 +266,19 @@ class ConfigLoader():
                 name), fg='red')
             sys.exit(1)
 
+    @staticmethod
+    def _find_resource_from_var(name, source, module_key):
+        """
+        Finds a resource from a modules value.
+        e.g. function_name = ${var.lambda_name}
+        in the module.
+        """
+        module_lambda_resources = ConfigLoader._load_module_source(name, source)
+        for lambda_resource in module_lambda_resources:
+            if module_key in module_lambda_resources[lambda_resource]['function_name']:
+                return module_lambda_resources[lambda_resource]
+        return None
+        
     @staticmethod
     def handle_load_dirs(config, handler, dir_):
         """
