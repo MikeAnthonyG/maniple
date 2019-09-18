@@ -10,8 +10,14 @@ from pathlib import Path
 from typing import Dict
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-logger.setLevel(logging.DEBUG)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger.setLevel(logging.INFO)
+
+# TODO: complete refactor
 
 
 class ConfigLoader():
@@ -201,7 +207,7 @@ class ConfigLoader():
         except KeyError:  # Module
             module_resource = None
             found_source = False
-            module_key = ""
+            module_key = ''
             tf_vars = {}
             try:
                 for mod in tf['module']:
@@ -225,21 +231,12 @@ class ConfigLoader():
                             fg='red')
                 sys.exit(1)
 
-            print(module_resource)
-            print(source_vars)
-            for tf_var_key in module_resource.keys():
-                for source_key, source_value in source_vars.items():
-                    try:
-                        if source_key in module_resource[tf_var_key]:
-                            tf_vars[tf_var_key] = source_value
-                    except TypeError:
-                        logger.debug('Found non-str value {}'.format(
-                            module_resource[tf_var_key]
-                        ))
+            ConfigLoader.replace_module_vars(
+                source_vars,
+                module_resource
+            )
 
-            # Return dictionary with the keys updated from tf_vars
-            print(dict(module_resource, **tf_vars))
-            return dict(module_resource, **tf_vars)
+            return module_resource
 
     @staticmethod
     def _load_module_source(name, source):
@@ -360,6 +357,28 @@ class ConfigLoader():
                 click.secho('Failed to handle S3 Key terraform variables.', fg='red')
                 sys.exit(1)
         return '/'.join(parsed_key)
+
+    @staticmethod
+    def replace_module_vars(source_vars, module_vars):
+        """
+        Replaces terraform variables in a module's source with the TF vars
+        from main.tf
+        """
+        module_no_tf_vars = {}
+        for key, value in source_vars.items():
+            key_hcl_format = '${var.' + key + '}'
+            for mod_key, mod_value in module_vars.items():
+                try:
+                    if key_hcl_format in mod_value:
+                        modified_value = mod_value.replace(
+                            key_hcl_format,
+                            value
+                        )
+                        module_no_tf_vars[mod_key] = modified_value
+                except TypeError:
+                    continue
+        module_vars.update(module_no_tf_vars)
+        return module_vars
 
     @staticmethod
     def get_runtime(config=None):
