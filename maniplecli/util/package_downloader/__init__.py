@@ -1,9 +1,12 @@
 import click
 import logging
+import json
 import shutil
 import sys
+import tarfile
 
 from pathlib import Path
+from zipfile import ZipFile
 from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
 from maniplecli.util.lambda_packages import lambda_packages
@@ -50,10 +53,7 @@ class PackageDownloader():
                 )
                 if package_path is not None:
                     package_path = Path(package_path)
-                    shutil.copy(
-                        package_path.resolve().__str__(),
-                        package
-                    )
+                    PackageDownloader._unzip_package(package_path, package)
                 else:
                     requirements_to_replace.append(py_package)
 
@@ -135,4 +135,20 @@ class PackageDownloader():
         else:
             return None
 
-    
+    @staticmethod
+    def _unzip_package(package_path, deployment_package):
+        if package_path.suffix == '.tar':
+            tar = tarfile.open(package_path, 'r:')
+            tar.extractall(deployment_package)
+            tar.close()
+        elif package_path.suffix == '.gz':  # .tar.gz
+            tar = tarfile.open(package_path, 'r:gz')
+            tar.extractall(deployment_package)
+            tar.close()
+        elif package_path.suffix == '.zip':
+            with ZipFile(package_path, 'r') as f:
+                f.extractall(deployment_package)
+        else:
+            logger.debug('Can\'t unzip package {}'.format(package_path))
+            click.secho('Unable to unzip package: {}'.format(
+                package_path.name), fg='red')
