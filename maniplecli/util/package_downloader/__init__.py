@@ -1,9 +1,12 @@
 import click
 import logging
+import json
 import shutil
 import sys
+import tarfile
 
 from pathlib import Path
+from zipfile import ZipFile
 from maniplecli.util.config_loader import ConfigLoader
 from maniplecli.util.shell import Shell
 from maniplecli.util.lambda_packages import lambda_packages
@@ -19,9 +22,13 @@ class PackageDownloader():
         runtime = ConfigLoader.get_runtime()
         if requirements is not None:
             if 'python' in runtime:
-                PackageDownloader._handle_python_packages(script, requirements, package)
+                PackageDownloader._handle_python_packages(
+                    script, requirements, package
+                )
             elif 'nodejs' in runtime:
-                PackageDownloader._handle_js_packages(script, requirements, package)
+                PackageDownloader._handle_js_packages(
+                    script, requirements, package
+                )
             else:
                 logger.debug('Unsupported runtime.')
                 click.echo('Runtime not supported.')
@@ -46,10 +53,7 @@ class PackageDownloader():
                 )
                 if package_path is not None:
                     package_path = Path(package_path)
-                    shutil.copy(
-                        package_path.resolve().__str__(),
-                        package
-                    )
+                    PackageDownloader._unzip_package(package_path, package)
                 else:
                     requirements_to_replace.append(py_package)
 
@@ -57,15 +61,20 @@ class PackageDownloader():
         cmds = []
         if package_path is not None:
             for requirement in requirements_to_replace:
-                cmds.append('pip install --target={} {}'.format(
-                    package,
+                cmds.append([
+                    'pip',
+                    'install',
+                    '--target={}'.format(package),
                     requirement.strip()
-                ))
+                ])
         else:
-            cmds.append('pip install --target={} -r {}'.format(
-                package,
+            cmds.append([
+                'pip',
+                'install',
+                '--target={}'.format(package),
+                '-r',
                 requirements
-            ))
+            ])
         for cmd in cmds:
             return_code, out, err = Shell.run(
                 cmd,
@@ -86,13 +95,13 @@ class PackageDownloader():
             sys.exit(1)
         for key, value in dependencies['dependencies'].items():                
             return_code, out, err = Shell.run(
-                'npm --prefix {} install key'.format(package),
+                ['npm', '--prefix', package, 'install', 'key'],
                 Path.getcwd()
             )
             if return_code != 0:
                 click.secho('{} failed.'.format('npm package install'), fg='red')
                 logger.error(err)
-                sys.exit(1)        
+                sys.exit(1)
 
     @staticmethod
     def _check_for_packages_to_replace(package_name):
@@ -126,4 +135,20 @@ class PackageDownloader():
         else:
             return None
 
-    
+    @staticmethod
+    def _unzip_package(package_path, deployment_package):
+        if package_path.suffix == '.tar':
+            tar = tarfile.open(package_path, 'r:')
+            tar.extractall(deployment_package)
+            tar.close()
+        elif package_path.suffix == '.gz':  # .tar.gz
+            tar = tarfile.open(package_path, 'r:gz')
+            tar.extractall(deployment_package)
+            tar.close()
+        elif package_path.suffix == '.zip':
+            with ZipFile(package_path, 'r') as f:
+                f.extractall(deployment_package)
+        else:
+            logger.debug('Can\'t unzip package {}'.format(package_path))
+            click.secho('Unable to unzip package: {}'.format(
+                package_path.name), fg='red')

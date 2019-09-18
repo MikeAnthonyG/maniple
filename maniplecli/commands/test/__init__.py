@@ -70,7 +70,7 @@ def run_js_tests(config, test_file):
     if platform.system() == 'Windows':
         run_test('npm.cmd test', 'nodejs')
     else:
-        run_test('npm test', 'nodejs')
+        run_test(['npm', 'test'], 'nodejs')
     
 
 def get_test_files(dir_, test_list):

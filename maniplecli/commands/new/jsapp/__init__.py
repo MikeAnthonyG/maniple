@@ -25,7 +25,7 @@ class jsapp:
             if platform.system() == 'Windows':
                 Shell.run('npm.cmd install', os.getcwd())
             else:
-                Shell.run('npm install', os.getcwd())
+                Shell.run(['npm', 'install'], os.getcwd())
         except FileExistsError:
             click.echo('Already attempted to create a lambda function here.')
             click.echo('Delete files and try again.')
