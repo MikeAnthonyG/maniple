@@ -343,6 +343,9 @@ class ConfigLoader():
     def determine_version(key, tf):
         """
         Determines version in the terraform main file.
+
+        This works with variable blocks but not for modules.
+        
         """
         parsed_key = []
         for x in key.strip('/').split('/'):
@@ -355,7 +358,7 @@ class ConfigLoader():
             except KeyError:
                 logger.debug('Unable to set proper version to files.')
                 click.secho('Failed to handle S3 Key terraform variables.', fg='red')
-                sys.exit(1)
+                click.secho('Set s3 key manually: maniple config --s3-key [KEY]')
         return '/'.join(parsed_key)
 
     @staticmethod
